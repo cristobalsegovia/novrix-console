@@ -1,0 +1,37 @@
+[package]
+name = "switchboard"
+version = "0.6.0"
+description = "Switchboard Term — a session-oriented terminal for macOS"
+authors = ["Cristóbal Segovia"]
+license = "Apache-2.0"
+repository = "https://github.com/kingfisher-it/switchboard-term"
+edition = "2021"
+
+[lib]
+name = "switchboard_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.53", features = ["full"] }
+portable-pty = "0.9"
+russh = "0.62"
+uuid = { version = "1.24", features = ["v4"] }
+thiserror = "2.0"
+dirs = "6.0"
+rusqlite = { version = "0.40", features = ["bundled"] }
+keyring = { version = "3.6", features = ["apple-native", "linux-native", "windows-native"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+tauri-plugin-clipboard-manager = "2.3"
+tauri-plugin-opener = "2.5"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
