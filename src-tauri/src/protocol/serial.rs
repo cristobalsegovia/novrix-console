@@ -472,6 +472,93 @@ mod tests {
         }
     }
 
+    // --- Live serial integration (spec task 10.4) -------------------------
+    //
+    // Exercises the real serial boundary end to end. Two layers:
+    //
+    //   * Enumeration always runs and must not panic (it is host-dependent, so
+    //     no assertion is made on the contents) — this covers the "open and
+    //     enumeration" half of task 10.4 that needs the real OS serial API.
+    //   * If `NOVRIX_IT_SERIAL_PORT` names a port (e.g. a virtual port created
+    //     with `socat PTY,link=/tmp/ttyA ... PTY,link=/tmp/ttyB`), the test
+    //     opens it through the real `SerialProtocol`, writes a marker, and
+    //     tears the port down. When the env var is unset (the common case) the
+    //     open half SKIPS, so `cargo test -- --ignored` is safe with no device.
+    //
+    // `#[ignore]`d so it never runs in the default suite; CI / a developer runs
+    // it with `cargo test -- --ignored` once a (virtual) port is provisioned.
+    #[tokio::test]
+    #[ignore = "requires the real OS serial API / a (virtual) serial port; set NOVRIX_IT_SERIAL_PORT to open one"]
+    async fn serial_live_enumeration_and_optional_open() {
+        use crate::domain::ProtocolParams;
+
+        // Enumeration against the real OS API must succeed or return a
+        // structured I/O error — never panic — and its result classifies into
+        // the no-ports indication deterministically (Requirement 6.3/6.4).
+        match available_port_names() {
+            Ok(names) => {
+                let _ = no_ports_available(&names);
+            }
+            Err(ProtocolError::Io(_)) => {}
+            Err(other) => panic!("unexpected enumeration error: {other:?}"),
+        }
+
+        // Open half: only when a concrete port is provided.
+        let port_name = match std::env::var("NOVRIX_IT_SERIAL_PORT") {
+            Ok(p) if !p.trim().is_empty() => p,
+            _ => {
+                eprintln!(
+                    "SKIP serial open half: NOVRIX_IT_SERIAL_PORT not set \
+                     (enumeration half ran)"
+                );
+                return;
+            }
+        };
+
+        let params = ProtocolParams::Serial {
+            port_name: port_name.clone(),
+            baud: BaudRate::B115200,
+            data_bits: DataBits::Eight,
+            parity: Parity::None,
+            stop_bits: StopBits::One,
+        };
+        let profile = crate::domain::ConnectionProfile {
+            id: crate::domain::ProfileId::new(),
+            name: "it-serial".to_string(),
+            protocol: ProtocolKind::Serial,
+            host: String::new(),
+            port: 0,
+            username: None,
+            domain: None,
+            folder_id: None,
+            auth: crate::domain::AuthConfig::None,
+            protocol_params: params,
+            logging_enabled: false,
+            log_path: None,
+            connect_timeout_secs: 30,
+        };
+        let resolved = ResolvedProfile::new(profile);
+
+        let mut session = SerialProtocol::new()
+            .establish(&resolved, CredentialHandle::none())
+            .await
+            .unwrap_or_else(|e| panic!("opening serial port `{port_name}` failed: {e:?}"));
+        assert_eq!(session.state(), SessionState::Connected);
+
+        // A write to a (loopback/virtual) port should succeed; we do not assert
+        // on read content because the peer end is test-harness-specific.
+        session
+            .send(b"novrix-serial-it\n")
+            .await
+            .expect("writing to the open serial port should succeed");
+
+        session
+            .close()
+            .await
+            .expect("closing the port should succeed");
+        assert_eq!(session.state(), SessionState::Disconnected);
+    }
+
     // --- Task 10.2 / Property 17: Serial parameter validity ---------------
 
     mod properties {

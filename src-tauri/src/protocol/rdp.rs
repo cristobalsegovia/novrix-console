@@ -2357,4 +2357,121 @@ mod tests {
             }
         }
     }
+
+    // --- Live RDP integration (spec task 11.4) ----------------------------
+    //
+    // Connects to a *real* RDP server over the actual ironrdp transport and
+    // CredSSP/NLA path, proving connect + authentication + a live session
+    // (Requirements 7.1/7.4/7.7). It drives the production `IronRdpConnector`
+    // and `RdpProtocol::establish`, differing from production only in the two
+    // injected trust/credential fakes (accept the server cert; resolve the
+    // account from the environment).
+    //
+    // Coordinates come from the environment so it targets whatever RDP host is
+    // provisioned (a Windows VM, an xrdp container, etc.):
+    //   NOVRIX_IT_RDP_HOST, NOVRIX_IT_RDP_PORT, NOVRIX_IT_RDP_USER,
+    //   NOVRIX_IT_RDP_PASSWORD, NOVRIX_IT_RDP_DOMAIN (optional)
+    // When the host is unset the test SKIPS (never fails), so it is safe to run
+    // with `cargo test -- --ignored` anywhere. `#[ignore]`d by default; a real
+    // run needs an RDP server reachable from the runner.
+    #[tokio::test]
+    #[ignore = "requires a live RDP server (and NLA credentials); set NOVRIX_IT_RDP_*"]
+    async fn rdp_live_connect_and_authenticate() {
+        use crate::domain::{
+            AuthConfig, ConnectionProfile, CredentialKey, ProfileId, ProtocolParams,
+        };
+        use std::sync::Arc;
+
+        let host = match std::env::var("NOVRIX_IT_RDP_HOST") {
+            Ok(h) if !h.trim().is_empty() => h,
+            _ => {
+                eprintln!("SKIP rdp_live_connect_and_authenticate: NOVRIX_IT_RDP_HOST not set");
+                return;
+            }
+        };
+        let port: u16 = std::env::var("NOVRIX_IT_RDP_PORT")
+            .ok()
+            .and_then(|p| p.trim().parse().ok())
+            .unwrap_or(3389);
+        let username =
+            std::env::var("NOVRIX_IT_RDP_USER").unwrap_or_else(|_| "Administrator".to_string());
+        let password = std::env::var("NOVRIX_IT_RDP_PASSWORD").unwrap_or_default();
+        let domain = std::env::var("NOVRIX_IT_RDP_DOMAIN")
+            .ok()
+            .filter(|d| !d.is_empty());
+
+        // Trust/credential fakes: accept the integration server's certificate
+        // (trust-on-first-use for the test host) and resolve the account from
+        // the environment. Everything else is the production path.
+        struct AcceptCert;
+        impl RdpCertVerifier for AcceptCert {
+            fn verify_certificate(&self, _cert_der: &[u8]) -> bool {
+                true
+            }
+        }
+        struct EnvCreds {
+            username: String,
+            password: String,
+            domain: Option<String>,
+        }
+        #[async_trait]
+        impl RdpCredentialSource for EnvCreds {
+            async fn resolve(
+                &self,
+                _handle: &CredentialHandle,
+            ) -> Result<ResolvedCredential, ProtocolError> {
+                Ok(ResolvedCredential::new(
+                    self.username.clone(),
+                    self.password.clone(),
+                    self.domain.clone(),
+                ))
+            }
+        }
+
+        let proto = RdpProtocol::new(
+            IronRdpConnector::new(Arc::new(AcceptCert)),
+            EnvCreds {
+                username,
+                password,
+                domain,
+            },
+        );
+
+        let profile = ConnectionProfile {
+            id: ProfileId::new(),
+            name: "it-rdp".to_string(),
+            protocol: ProtocolKind::Rdp,
+            host,
+            port,
+            username: None,
+            domain: None,
+            folder_id: None,
+            auth: AuthConfig::Password {
+                credential_key: CredentialKey::new("it/rdp/password"),
+            },
+            protocol_params: ProtocolParams::Rdp { resolution: None },
+            logging_enabled: false,
+            log_path: None,
+            connect_timeout_secs: 20,
+        };
+        let resolved = ResolvedProfile::new(profile);
+
+        // A credential handle naming a key, so the establish flow proceeds to
+        // the connector (an empty handle would short-circuit as MissingCredentials).
+        let handle = CredentialHandle::with_key(CredentialKey::new("it/rdp/password"));
+
+        // (Requirement 7.1/7.4/7.7) Live connect + NLA auth yields a Connected
+        // session over the real ironrdp transport.
+        let mut session = proto
+            .establish(&resolved, handle)
+            .await
+            .expect("live RDP connect + authentication should succeed");
+        assert_eq!(session.state(), SessionState::Connected);
+
+        // Tearing the session down releases the transport (no half-open).
+        session
+            .close()
+            .await
+            .expect("closing the RDP session should succeed");
+    }
 }

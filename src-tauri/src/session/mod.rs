@@ -1181,4 +1181,52 @@ mod tests {
             }
         }
     }
+
+    // --- Session capacity performance (spec task 24.2) --------------------
+    //
+    // Timing/capacity bound: the manager must sustain at least the required
+    // number of concurrent Sessions (Requirement 9.3, >= 20) and do so quickly
+    // enough to meet the per-tab budget (new tab <= 2 s). Driven with the
+    // no-network `MockConn`, so it measures the manager's own bookkeeping cost,
+    // not any transport. `#[ignore]`d; CI runs it via `--ignored perf`.
+    #[tokio::test]
+    #[ignore = "performance/capacity bound; run via `cargo test --release -- --ignored perf`"]
+    async fn perf_sustains_twenty_concurrent_sessions_within_budget() {
+        let mgr = SessionManager::new();
+
+        // Keep the recv senders alive so the read loops stay parked (dropping
+        // them would signal EOF and flip sessions to Disconnected).
+        let mut keepalive = Vec::new();
+        let start = std::time::Instant::now();
+        for _ in 0..MAX_CONCURRENT {
+            let (src, rx, _closed, _sent) = source(SessionState::Connected);
+            mgr.open_session(src).await.expect("open within capacity");
+            keepalive.push(rx);
+        }
+        let elapsed = start.elapsed();
+
+        // Capacity: all MAX_CONCURRENT (>= 20) are open simultaneously.
+        assert_eq!(mgr.open_count().await, MAX_CONCURRENT);
+        assert!(
+            MAX_CONCURRENT >= 20,
+            "requirement 9.3 mandates at least 20 concurrent sessions"
+        );
+
+        // Budget: opening the whole set must be well under the per-tab bound.
+        // Even generous CI headroom (MAX_CONCURRENT * 2 s) is orders of
+        // magnitude above the pure-bookkeeping cost measured here.
+        let budget = std::time::Duration::from_secs(2) * (MAX_CONCURRENT as u32);
+        assert!(
+            elapsed < budget,
+            "opening {MAX_CONCURRENT} sessions took {elapsed:?}, over budget {budget:?}"
+        );
+        eprintln!(
+            "perf: opened {MAX_CONCURRENT} concurrent sessions in {elapsed:?} (budget {budget:?})"
+        );
+
+        // The 21st open is refused without disturbing the open set (capacity cap).
+        let (over, _rx, _c, _s) = source(SessionState::Connecting);
+        assert!(mgr.open_session(over).await.is_err());
+        assert_eq!(mgr.open_count().await, MAX_CONCURRENT);
+    }
 }

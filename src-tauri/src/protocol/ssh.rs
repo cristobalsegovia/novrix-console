@@ -1404,4 +1404,117 @@ mod tests {
             prop_assert_eq!(session.state(), SessionState::Disconnected);
         }
     }
+
+    // --- Live SSH + SFTP integration (spec tasks 15.6, 16.7) --------------
+    //
+    // Connects to a *real* SSH server over the actual russh transport, proving
+    // the end-to-end connect + password auth + session channel (task 16.7's
+    // "logging start on connect" precondition: a live, connected session) and
+    // the SFTP subsystem the File_Transfer_Service rides on (task 15.6).
+    //
+    // Coordinates come from the environment so it targets whatever the CI
+    // `integration-ssh` job (an OpenSSH service container) or a developer stood
+    // up:
+    //   NOVRIX_IT_SSH_HOST, NOVRIX_IT_SSH_PORT, NOVRIX_IT_SSH_USER,
+    //   NOVRIX_IT_SSH_PASSWORD
+    // When unset, the test SKIPS (never fails), so `cargo test -- --ignored`
+    // is safe with no server. `#[ignore]`d by default.
+    #[tokio::test]
+    #[ignore = "requires a live SSH server; run in CI (integration-ssh) or set NOVRIX_IT_SSH_*"]
+    async fn ssh_live_connect_auth_and_open_sftp() {
+        use crate::domain::{
+            AuthConfig, ConnectionProfile, CredentialKey, ProfileId, ProtocolParams,
+        };
+        use std::sync::Arc;
+
+        // --- env-driven coordinates (skip when absent) --------------------
+        let host = match std::env::var("NOVRIX_IT_SSH_HOST") {
+            Ok(h) if !h.trim().is_empty() => h,
+            _ => {
+                eprintln!("SKIP ssh_live_connect_auth_and_open_sftp: NOVRIX_IT_SSH_HOST not set");
+                return;
+            }
+        };
+        let port: u16 = std::env::var("NOVRIX_IT_SSH_PORT")
+            .ok()
+            .and_then(|p| p.trim().parse().ok())
+            .unwrap_or(22);
+        let user = std::env::var("NOVRIX_IT_SSH_USER").unwrap_or_else(|_| "tester".to_string());
+        let password =
+            std::env::var("NOVRIX_IT_SSH_PASSWORD").unwrap_or_else(|_| "testpass".to_string());
+
+        // --- test ports: resolve the password, accept the host key ---------
+        struct EnvSecret(String);
+        #[async_trait]
+        impl SecretResolver for EnvSecret {
+            async fn resolve_secret(
+                &self,
+                _key: &CredentialKey,
+            ) -> Result<Option<String>, ProtocolError> {
+                Ok(Some(self.0.clone()))
+            }
+        }
+        struct NoKeys;
+        #[async_trait]
+        impl SshKeyResolver for NoKeys {
+            async fn resolve_key(
+                &self,
+                _key_id: crate::domain::KeyId,
+            ) -> Result<Option<String>, ProtocolError> {
+                Ok(None)
+            }
+        }
+        struct AcceptHostKey;
+        #[async_trait]
+        impl HostKeyVerifier for AcceptHostKey {
+            async fn confirm_unknown_host_key(&self, _fingerprint: &str) -> bool {
+                true // trust-on-first-use for the integration server
+            }
+        }
+
+        let proto = SshProtocol::new(
+            Arc::new(EnvSecret(password)),
+            Arc::new(NoKeys),
+            Arc::new(AcceptHostKey),
+            SshIdentity::new(user),
+        );
+
+        let profile = ConnectionProfile {
+            id: ProfileId::new(),
+            name: "it-ssh".to_string(),
+            protocol: ProtocolKind::Ssh,
+            host,
+            port,
+            username: None,
+            domain: None,
+            folder_id: None,
+            auth: AuthConfig::Password {
+                credential_key: CredentialKey::new("it/ssh/password"),
+            },
+            protocol_params: ProtocolParams::Ssh {
+                known_host_policy: crate::domain::HostKeyPolicy::AcceptAny,
+            },
+            logging_enabled: false,
+            log_path: None,
+            connect_timeout_secs: 15,
+        };
+        let resolved = ResolvedProfile::new(profile);
+
+        // (Requirement 4 / task 16.7 precondition) Live connect + password auth
+        // yields a Connected session over the real russh transport.
+        let session = proto
+            .establish_session(&resolved, CredentialHandle::none())
+            .await
+            .expect("live SSH connect + password auth should succeed");
+        assert_eq!(session.state(), SessionState::Connected);
+
+        // (task 15.6) The SFTP subsystem opens on a second channel of the same
+        // connection — the seam the File_Transfer_Service rides. Opening it
+        // proves SFTP is reachable end to end against a real server.
+        let _sftp = session
+            .open_sftp_session()
+            .await
+            .expect("opening the SFTP subsystem on the live SSH connection should succeed");
+        eprintln!("ssh integration: connected, authenticated, and opened SFTP");
+    }
 }

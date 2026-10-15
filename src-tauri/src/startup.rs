@@ -163,6 +163,48 @@ fn parse_major(version: &str) -> Option<u32> {
 mod tests {
     use super::*;
 
+    // --- Platform startup smoke (spec task 24.1) --------------------------
+    //
+    // Runs on the *real* host and asserts the OS-version gate admits it. On the
+    // macOS and Windows CI runners this proves the app's startup precondition
+    // (Requirement 1.6) holds on a genuinely supported platform — the half of
+    // task 24.1 that a single dev machine cannot cover for both OSes. It is
+    // `#[ignore]`d (CI runs it via `cargo test -- --ignored startup`) and is
+    // careful not to assume a particular OS: on an unsupported/undetectable
+    // host it SKIPS rather than failing, so it is safe to invoke anywhere.
+    #[test]
+    #[ignore = "platform startup smoke; run per-OS in CI via `--ignored startup`"]
+    fn startup_gate_admits_the_real_host() {
+        match detect_host_os() {
+            Some(
+                v @ HostOsVersion {
+                    os: HostOs::MacOs, ..
+                },
+            )
+            | Some(
+                v @ HostOsVersion {
+                    os: HostOs::Windows,
+                    ..
+                },
+            ) => {
+                // A supported OS was detected: the gate must admit it (the CI
+                // runners are current macOS/Windows, well above the minimums).
+                evaluate_startup(Some(v)).unwrap_or_else(|e| {
+                    panic!(
+                        "startup gate rejected a supported host {v:?}: {}",
+                        e.message
+                    )
+                });
+                eprintln!("startup smoke: host {v:?} admitted");
+            }
+            other => {
+                // Unsupported OS (e.g. Linux CI) or undetectable version: this
+                // smoke test targets the macOS/Windows runners, so skip here.
+                eprintln!("SKIP startup smoke: host not a supported target ({other:?})");
+            }
+        }
+    }
+
     #[test]
     fn allows_macos_at_minimum() {
         assert!(evaluate_startup(Some(HostOsVersion::new(HostOs::MacOs, 12))).is_ok());

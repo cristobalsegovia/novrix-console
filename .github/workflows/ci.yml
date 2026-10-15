@@ -110,14 +110,14 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Integration: SSH + SFTP against a live OpenSSH server (spec tasks 15.6, 16.7).
-  # Linux-only (the service container runs on the Linux runner). Runs the Rust
-  # tests tagged `#[ignore]` that connect to the server defined below.
+  # Runs `ssh_live_connect_auth_and_open_sftp`, which connects over the real
+  # russh transport, authenticates with a password, and opens the SFTP
+  # subsystem. Kept non-blocking because it depends on a third-party service
+  # container that can occasionally be flaky on the runner.
   # ---------------------------------------------------------------------------
   integration-ssh:
     name: Integration — SSH/SFTP (live OpenSSH)
     runs-on: ubuntu-latest
-    # Non-blocking: provisions a live OpenSSH service, but the #[ignore]d
-    # SSH/SFTP integration tests (tasks 15.6, 16.7) are not written yet.
     continue-on-error: true
     services:
       sshd:
@@ -130,9 +130,6 @@ jobs:
         ports:
           - 2222:2222
     env:
-      # The `#[ignore]`d SSH/SFTP integration tests read these to find the
-      # server; they skip gracefully if unset so local `--ignored` runs don't
-      # hang trying to reach a server that isn't there.
       NOVRIX_IT_SSH_HOST: 127.0.0.1
       NOVRIX_IT_SSH_PORT: "2222"
       NOVRIX_IT_SSH_USER: tester
@@ -143,18 +140,20 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-      - name: Run ignored SSH/SFTP integration tests (tasks 15.6, 16.7)
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config
+      - name: Run SSH/SFTP integration test (tasks 15.6, 16.7)
         working-directory: src-tauri
-        run: cargo test --lib -- --ignored --nocapture
+        run: cargo test --lib -- --ignored --nocapture ssh_live
 
   # ---------------------------------------------------------------------------
-  # Integration: Telnet against a live telnet server (spec task 9.3).
+  # Integration: Telnet against a live echo server (spec task 9.3).
   # ---------------------------------------------------------------------------
   integration-telnet:
     name: Integration — Telnet (live server)
     runs-on: ubuntu-latest
-    # Non-blocking until the #[ignore]d Telnet integration test (task 9.3) lands.
-    continue-on-error: true
     env:
       NOVRIX_IT_TELNET_HOST: 127.0.0.1
       NOVRIX_IT_TELNET_PORT: "2323"
@@ -164,62 +163,135 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config socat
       - name: Start a telnet echo server
         run: |
-          # A minimal line-oriented telnet server for the connect/echo test.
-          # Runs in the background; the `#[ignore]`d Telnet integration test
-          # connects to NOVRIX_IT_TELNET_* and verifies the handshake + echo.
-          sudo apt-get update && sudo apt-get install -y telnetd-ssl socat
           nohup socat TCP-LISTEN:2323,reuseaddr,fork EXEC:'/bin/cat' >/tmp/telnet.log 2>&1 &
           sleep 2
-      - name: Run ignored Telnet integration tests (task 9.3)
+      - name: Run Telnet integration test (task 9.3)
         working-directory: src-tauri
-        run: cargo test --lib -- --ignored --nocapture telnet
+        run: cargo test --lib -- --ignored --nocapture telnet_live
 
   # ---------------------------------------------------------------------------
-  # Smoke: application startup on macOS and Windows (spec task 24.1).
-  # Builds the full Tauri app (not just the lib) so startup is exercised.
+  # Integration: Serial over a virtual port pair (spec task 10.4). socat links
+  # two PTYs; the test opens one end through the real serialport backend. On
+  # Linux a socat PTY accepts the termios ioctls the serialport crate issues.
   # ---------------------------------------------------------------------------
-  smoke:
-    name: Smoke — startup (${{ matrix.os }})
+  integration-serial:
+    name: Integration — Serial (virtual port)
+    runs-on: ubuntu-latest
+    env:
+      NOVRIX_IT_SERIAL_PORT: /tmp/ttyNVX_A
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config socat
+      - name: Create a linked virtual serial port pair
+        run: |
+          nohup socat PTY,link=/tmp/ttyNVX_A,raw,echo=0 PTY,link=/tmp/ttyNVX_B,raw,echo=0 \
+            >/tmp/socat_serial.log 2>&1 &
+          sleep 2
+      - name: Run Serial integration test (task 10.4)
+        working-directory: src-tauri
+        run: cargo test --lib -- --ignored --nocapture serial_live
+
+  # ---------------------------------------------------------------------------
+  # Integration: OS secure storage (spec task 5.5). The Keychain (macOS) /
+  # Credential Manager (Windows) round-trip. Linux has no default Secret
+  # Service on the runner, so the test skips there; macOS/Windows exercise it.
+  # ---------------------------------------------------------------------------
+  integration-secure-storage:
+    name: Integration — Secure storage (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    # Non-blocking until the #[ignore]d startup smoke tests (task 24.1) land.
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-      - name: Install frontend dependencies
-        run: npm ci
-      - name: Run ignored startup smoke tests (task 24.1)
+      - name: Run secure-storage integration test (task 5.5)
         working-directory: src-tauri
-        run: cargo test --lib -- --ignored --nocapture startup
+        run: cargo test --lib -- --ignored --nocapture secure_storage
 
   # ---------------------------------------------------------------------------
-  # Performance: timing / capacity bounds (spec task 24.2). Dedicated job so the
-  # measurements are not perturbed by other work on the runner.
+  # Integration: RDP against a live server (spec task 11.4). No RDP host is
+  # provisioned by default, so the test SKIPS unless NOVRIX_IT_RDP_* secrets are
+  # set (point them at a reachable RDP server to run it for real). Non-blocking.
   # ---------------------------------------------------------------------------
-  performance:
-    name: Performance — timing & capacity bounds
+  integration-rdp:
+    name: Integration — RDP (live server, opt-in)
     runs-on: ubuntu-latest
-    # Non-blocking until the #[ignore]d performance tests (task 24.2) land.
     continue-on-error: true
+    env:
+      NOVRIX_IT_RDP_HOST: ${{ secrets.NOVRIX_IT_RDP_HOST }}
+      NOVRIX_IT_RDP_PORT: ${{ secrets.NOVRIX_IT_RDP_PORT }}
+      NOVRIX_IT_RDP_USER: ${{ secrets.NOVRIX_IT_RDP_USER }}
+      NOVRIX_IT_RDP_PASSWORD: ${{ secrets.NOVRIX_IT_RDP_PASSWORD }}
+      NOVRIX_IT_RDP_DOMAIN: ${{ secrets.NOVRIX_IT_RDP_DOMAIN }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-      - name: Run ignored performance tests (task 24.2)
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config
+      - name: Run RDP integration test (task 11.4)
+        working-directory: src-tauri
+        run: cargo test --lib -- --ignored --nocapture rdp_live
+
+  # ---------------------------------------------------------------------------
+  # Smoke: application startup on macOS and Windows (spec task 24.1).
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: Smoke — startup (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - name: Run startup smoke test (task 24.1)
+        working-directory: src-tauri
+        run: cargo test --lib -- --ignored --nocapture startup
+
+  # ---------------------------------------------------------------------------
+  # Performance: timing / capacity bounds (spec task 24.2). Release build so the
+  # measurements reflect optimized code; dedicated job for stable timing.
+  # ---------------------------------------------------------------------------
+  performance:
+    name: Performance — timing & capacity bounds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config
+      - name: Run performance test (task 24.2)
         working-directory: src-tauri
         run: cargo test --lib --release -- --ignored --nocapture perf

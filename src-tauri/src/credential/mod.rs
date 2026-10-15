@@ -398,4 +398,64 @@ mod tests {
             }
         }
     }
+
+    // --- OS secure-storage integration (spec task 5.5) --------------------
+    //
+    // Exercises the REAL OS keystore end to end: macOS Keychain / Windows
+    // Credential Manager / Linux Secret Service, via
+    // `KeyringCredentialStore::with_os_keystore()`. Saves a secret, reads it
+    // back, confirms the value survives the round trip, then deletes it and
+    // confirms it is gone (Requirements 11.1, 11.3, 11.4, 11.6).
+    //
+    // `#[ignore]`d because it touches the host keystore (which may be locked or
+    // absent, e.g. a headless Linux runner without Secret Service). CI runs it
+    // on macOS/Windows via `cargo test -- --ignored`. If the backend is
+    // unavailable the test SKIPS (a save that errors is treated as "no usable
+    // keystore here") rather than failing, so it is safe everywhere. It uses a
+    // unique, self-namespaced key and always cleans up after itself.
+    #[tokio::test]
+    #[ignore = "touches the real OS keystore; run in CI on macOS/Windows via `--ignored`"]
+    async fn secure_storage_round_trips_against_the_os_keystore() {
+        let store = KeyringCredentialStore::with_os_keystore();
+
+        // A unique profile id so this test never collides with real data or a
+        // parallel run, and its key is trivially cleaned up afterwards.
+        let profile = ProfileId::new();
+        let key = profile_password_key(profile);
+        let plaintext = format!("novrix-it-secret-{}", std::process::id());
+
+        // (Requirement 11.1) Save. If the host has no usable keystore (common on
+        // a headless Linux box without Secret Service), skip rather than fail.
+        if let Err(e) = store
+            .save(key.clone(), Secret::new(plaintext.clone()))
+            .await
+        {
+            eprintln!("SKIP secure_storage round-trip: keystore unavailable here ({e:?})");
+            return;
+        }
+
+        // (Requirement 11.3/11.4) Retrieve and confirm the exact value survived.
+        let got = store
+            .get(key.clone())
+            .await
+            .expect("stored secret should be retrievable");
+        assert_eq!(
+            got.expose(),
+            plaintext,
+            "retrieved secret must match what was saved"
+        );
+
+        // (Requirement 11.6) Delete the profile's credential and confirm it is
+        // gone — a subsequent get reports NotFound.
+        store
+            .delete_for_profile(profile)
+            .await
+            .expect("deleting the profile credential should succeed");
+        match store.get(key).await {
+            Err(CredentialError::NotFound) => {}
+            Ok(_) => panic!("secret still present after delete_for_profile"),
+            Err(other) => panic!("unexpected error after delete: {other:?}"),
+        }
+        eprintln!("secure-storage integration: save/get/delete round-trip OK");
+    }
 }

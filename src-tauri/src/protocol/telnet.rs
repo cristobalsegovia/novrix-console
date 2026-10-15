@@ -563,4 +563,94 @@ mod tests {
             Ok(_) => panic!("port 0 must be rejected, but a session was established"),
         }
     }
+
+    // --- Live Telnet integration (spec task 9.3) --------------------------
+    //
+    // Connects to a *real* Telnet server and verifies the connect + round-trip.
+    // It is `#[ignore]`d so it never runs in the default suite; CI runs it with
+    // `cargo test -- --ignored telnet` against the echo server the
+    // `integration-telnet` job starts (socat TCP-LISTEN ... EXEC:/bin/cat).
+    //
+    // Server coordinates come from the environment so the test targets whatever
+    // the CI job (or a developer) stood up:
+    //   NOVRIX_IT_TELNET_HOST, NOVRIX_IT_TELNET_PORT
+    // When those are unset (the common local case) the test SKIPS with a note
+    // rather than failing, so `cargo test -- --ignored` is safe anywhere.
+    #[tokio::test]
+    #[ignore = "requires a live Telnet server; run in CI (integration-telnet) or set NOVRIX_IT_TELNET_*"]
+    async fn telnet_live_connect_and_echo_round_trips() {
+        use crate::domain::{AuthConfig, ConnectionProfile, ProfileId, ProtocolParams};
+
+        let host = match std::env::var("NOVRIX_IT_TELNET_HOST") {
+            Ok(h) if !h.trim().is_empty() => h,
+            _ => {
+                eprintln!(
+                    "SKIP telnet_live_connect_and_echo_round_trips: \
+                     NOVRIX_IT_TELNET_HOST not set"
+                );
+                return;
+            }
+        };
+        let port: u16 = std::env::var("NOVRIX_IT_TELNET_PORT")
+            .ok()
+            .and_then(|p| p.trim().parse().ok())
+            .unwrap_or(23);
+
+        let profile = ConnectionProfile {
+            id: ProfileId::new(),
+            name: "it-telnet".to_string(),
+            protocol: ProtocolKind::Telnet,
+            host,
+            port,
+            username: None,
+            domain: None,
+            folder_id: None,
+            auth: AuthConfig::None,
+            protocol_params: ProtocolParams::Telnet {},
+            logging_enabled: false,
+            log_path: None,
+            connect_timeout_secs: 10,
+        };
+        let resolved = ResolvedProfile::new(profile);
+
+        // (req 5.1/5.2) A real connect must succeed and yield a Connected session.
+        let mut session = TelnetProtocol::new()
+            .establish(&resolved, CredentialHandle::none())
+            .await
+            .expect("live Telnet connect should succeed");
+        assert_eq!(session.state(), SessionState::Connected);
+
+        // Round-trip: the echo server returns whatever we send. Send a unique
+        // marker and read until we see it (bounded so a misbehaving server can
+        // never hang CI).
+        let marker = format!("novrix-it-{}\n", std::process::id());
+        session
+            .send(marker.as_bytes())
+            .await
+            .expect("send over live Telnet should succeed");
+
+        let mut seen = Vec::new();
+        let deadline = std::time::Duration::from_secs(10);
+        let echoed = tokio::time::timeout(deadline, async {
+            loop {
+                match session.recv().await {
+                    Ok(Some(chunk)) => {
+                        seen.extend_from_slice(&chunk);
+                        if seen.windows(marker.len()).any(|w| w == marker.as_bytes()) {
+                            return true;
+                        }
+                    }
+                    // Clean EOF before the echo: the server closed early.
+                    Ok(None) => return false,
+                    Err(e) => panic!("recv over live Telnet failed: {e:?}"),
+                }
+            }
+        })
+        .await
+        .expect("timed out waiting for the Telnet echo");
+        assert!(echoed, "the echo server did not return our marker");
+
+        // Releasing the session closes the socket (req 5 / Requirement 8.3).
+        session.close().await.expect("close should succeed");
+    }
 }
