@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!--
+    Declares a dependency on Common Controls v6. Without it, a test binary that
+    links `tauri` fails to start on Windows with STATUS_ENTRYPOINT_NOT_FOUND
+    (exit code 0xc0000139) because `tauri` references comctl32 v6 entry points
+    that are not activated otherwise. This mirrors Tauri's own fix
+    (tauri-apps/tauri PR #4383 / issue #11028). Embedded by build.rs on Windows.
+  -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
