@@ -56,7 +56,7 @@ pub use known_hosts::{
 /// Stored in SQLite's `PRAGMA user_version`. [`Database::open`] migrates any
 /// older database forward to this version on open. Bumping this constant and
 /// adding a matching arm to [`migrate`] is how future schema changes ship.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// A handle to the local SQLite database holding profiles, folders, and
 /// settings.
@@ -179,6 +179,7 @@ fn migrate(conn: &Connection, target: u32) -> Result<(), DomainError> {
         1 => migrate_to_v1(conn),
         2 => migrate_to_v2(conn),
         3 => migrate_to_v3(conn),
+        4 => migrate_to_v4(conn),
         other => Err(DomainError::new(
             "persistence.migrate",
             format!("No migration defined for schema version {other}"),
@@ -297,6 +298,26 @@ fn migrate_to_v3(conn: &Connection) -> Result<(), DomainError> {
         "#,
     )
     .map_err(|e| persistence_error("persistence.migrate", "Failed to apply schema v3", e))?;
+    Ok(())
+}
+
+/// Schema v4: add the `snippets` table backing Command_Snippets (Requirement
+/// 19). Snippets live in the connection database alongside folders/profiles and
+/// never in Secure_Storage. `protocol` is NULL for an any-protocol snippet, or
+/// a `ProtocolKind` tag (e.g. 'ssh') to restrict it.
+fn migrate_to_v4(conn: &Connection) -> Result<(), DomainError> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE snippets (
+            id        TEXT PRIMARY KEY NOT NULL,
+            name      TEXT NOT NULL,
+            command   TEXT NOT NULL,
+            -- NULL = any text-based protocol; else a ProtocolKind tag.
+            protocol  TEXT
+        );
+        "#,
+    )
+    .map_err(|e| persistence_error("persistence.migrate", "Failed to apply schema v4", e))?;
     Ok(())
 }
 

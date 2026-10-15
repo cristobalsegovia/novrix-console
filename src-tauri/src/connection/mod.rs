@@ -46,8 +46,8 @@
 
 use crate::credential::{profile_password_key, CredentialStore, Secret};
 use crate::domain::{
-    AuthConfig, ConnectionProfile, DomainError, Folder, FolderId, ImportError, ProfileId,
-    ProtocolKind, ProtocolParams, ValidationError,
+    AuthConfig, CommandSnippet, ConnectionProfile, DomainError, Folder, FolderId, ImportError,
+    ProfileId, ProtocolKind, ProtocolParams, SnippetDraft, SnippetId, ValidationError,
 };
 use crate::persistence::Database;
 
@@ -276,6 +276,45 @@ fn is_valid_port(port: u16) -> bool {
 /// stored and displayed.
 ///
 /// On success returns `Ok(())`; the caller may then persist the name.
+/// Maximum length (in characters) of a snippet name or command.
+pub const SNIPPET_NAME_MAX_CHARS: usize = 255;
+pub const SNIPPET_COMMAND_MAX_CHARS: usize = 10_000;
+
+/// Validate a [`SnippetDraft`] (Requirement 19.2): both `name` and `command`
+/// must be non-empty (after trimming) and within length bounds. Returns the
+/// first offending field as a [`ValidationError`]; a pure function so it is
+/// trivially testable without persistence.
+pub fn validate_snippet_draft(draft: &SnippetDraft) -> Result<(), ValidationError> {
+    let name = draft.name.trim();
+    if name.is_empty() {
+        return Err(ValidationError {
+            field: "name".to_string(),
+            message: "A snippet name is required.".to_string(),
+        });
+    }
+    if name.chars().count() > SNIPPET_NAME_MAX_CHARS {
+        return Err(ValidationError {
+            field: "name".to_string(),
+            message: format!("A snippet name must be at most {SNIPPET_NAME_MAX_CHARS} characters."),
+        });
+    }
+    if draft.command.trim().is_empty() {
+        return Err(ValidationError {
+            field: "command".to_string(),
+            message: "Snippet command text is required.".to_string(),
+        });
+    }
+    if draft.command.chars().count() > SNIPPET_COMMAND_MAX_CHARS {
+        return Err(ValidationError {
+            field: "command".to_string(),
+            message: format!(
+                "Snippet command text must be at most {SNIPPET_COMMAND_MAX_CHARS} characters."
+            ),
+        });
+    }
+    Ok(())
+}
+
 pub fn validate_folder_name(name: &str, siblings: &[String]) -> Result<(), ValidationError> {
     let len = name.chars().count();
 
@@ -611,6 +650,65 @@ impl<C: CredentialStore> ConnectionManager<C> {
             .insert_folder(&folder)
             .map_err(|e| save_failure("create folder", e))?;
         Ok(folder)
+    }
+
+    // --- Command_Snippet management (Requirement 19) -----------------------
+
+    /// Validate and create a Command_Snippet (Requirement 19.1, 19.2). On a
+    /// validation failure nothing is stored; on success the saved snippet is
+    /// returned.
+    pub fn create_snippet(&self, draft: SnippetDraft) -> Result<CommandSnippet, DomainError> {
+        validate_snippet_draft(&draft)?;
+        let snippet = CommandSnippet {
+            id: SnippetId::new(),
+            name: draft.name.trim().to_string(),
+            command: draft.command,
+            protocol: draft.protocol,
+        };
+        self.db
+            .insert_snippet(&snippet)
+            .map_err(|e| save_failure("create snippet", e))?;
+        Ok(snippet)
+    }
+
+    /// Validate and update an existing Command_Snippet, applying the same rules
+    /// as creation (Requirement 19.3). On failure the prior state is retained.
+    pub fn update_snippet(
+        &self,
+        id: SnippetId,
+        draft: SnippetDraft,
+    ) -> Result<CommandSnippet, DomainError> {
+        validate_snippet_draft(&draft)?;
+        let snippet = CommandSnippet {
+            id,
+            name: draft.name.trim().to_string(),
+            command: draft.command,
+            protocol: draft.protocol,
+        };
+        self.db
+            .update_snippet(&snippet)
+            .map_err(|e| save_failure("update snippet", e))?;
+        Ok(snippet)
+    }
+
+    /// Delete a Command_Snippet after confirmation (Requirement 19.3). Without
+    /// confirmation nothing is removed.
+    pub fn delete_snippet(&self, id: SnippetId, confirmed: bool) -> Result<(), DomainError> {
+        if !confirmed {
+            return Err(DomainError::new(
+                CONFIRMATION_REQUIRED_CODE,
+                "Deleting a snippet requires confirmation.",
+            ));
+        }
+        self.db
+            .delete_snippet(id)
+            .map_err(|e| save_failure("delete snippet", e))?;
+        Ok(())
+    }
+
+    /// List every stored Command_Snippet.
+    pub fn list_snippets(&self) -> Result<Vec<CommandSnippet>, DomainError> {
+        self.db.list_snippets()
     }
 
     /// Validate and rename an existing folder (Requirements 3.9, 3.10).
@@ -1540,6 +1638,87 @@ mod tests {
             }
             other => panic!("expected password auth, got {other:?}"),
         }
+    }
+
+    // --- Command_Snippet management (Requirement 19) -----------------------
+
+    fn snippet_draft(name: &str, command: &str) -> SnippetDraft {
+        SnippetDraft {
+            name: name.to_string(),
+            command: command.to_string(),
+            protocol: None,
+        }
+    }
+
+    #[test]
+    fn snippet_validation_requires_name_and_command() {
+        // Empty name is rejected naming `name`.
+        let err = validate_snippet_draft(&snippet_draft("", "ls")).unwrap_err();
+        assert_eq!(err.field, "name");
+        // Whitespace-only name is likewise rejected.
+        let err = validate_snippet_draft(&snippet_draft("   ", "ls")).unwrap_err();
+        assert_eq!(err.field, "name");
+        // Empty command is rejected naming `command`.
+        let err = validate_snippet_draft(&snippet_draft("restart", "")).unwrap_err();
+        assert_eq!(err.field, "command");
+        // A fully specified draft is accepted.
+        assert!(
+            validate_snippet_draft(&snippet_draft("restart nginx", "systemctl restart nginx"))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn create_snippet_rejects_invalid_and_persists_valid() {
+        let manager = manager();
+        // Invalid: nothing stored.
+        assert!(manager.create_snippet(snippet_draft("", "x")).is_err());
+        assert_eq!(manager.list_snippets().unwrap().len(), 0);
+        // Valid: stored and listed, with a trimmed name.
+        let created = manager
+            .create_snippet(SnippetDraft {
+                name: "  deploy  ".to_string(),
+                command: "make deploy".to_string(),
+                protocol: Some(ProtocolKind::Ssh),
+            })
+            .unwrap();
+        assert_eq!(created.name, "deploy");
+        assert_eq!(created.protocol, Some(ProtocolKind::Ssh));
+        let all = manager.list_snippets().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].command, "make deploy");
+    }
+
+    #[test]
+    fn update_and_delete_snippet_round_trip() {
+        let manager = manager();
+        let created = manager
+            .create_snippet(snippet_draft("tmp", "echo hi"))
+            .unwrap();
+
+        // Update changes the stored fields.
+        let updated = manager
+            .update_snippet(
+                created.id,
+                SnippetDraft {
+                    name: "greet".to_string(),
+                    command: "echo hello".to_string(),
+                    protocol: Some(ProtocolKind::Telnet),
+                },
+            )
+            .unwrap();
+        assert_eq!(updated.name, "greet");
+        assert_eq!(updated.command, "echo hello");
+        assert_eq!(updated.protocol, Some(ProtocolKind::Telnet));
+
+        // Unconfirmed delete removes nothing.
+        let err = manager.delete_snippet(created.id, false).unwrap_err();
+        assert_eq!(err.code, CONFIRMATION_REQUIRED_CODE);
+        assert_eq!(manager.list_snippets().unwrap().len(), 1);
+
+        // Confirmed delete removes it.
+        manager.delete_snippet(created.id, true).unwrap();
+        assert_eq!(manager.list_snippets().unwrap().len(), 0);
     }
 
     // --- Folder name validation (task 3.8) ---------------------------------

@@ -30,8 +30,8 @@
 use rusqlite::{OptionalExtension, Row};
 
 use crate::domain::{
-    AuthConfig, ConnectionProfile, CredentialKey, DomainError, Folder, FolderId, KeyId, ProfileId,
-    ProtocolKind,
+    AuthConfig, CommandSnippet, ConnectionProfile, CredentialKey, DomainError, Folder, FolderId,
+    KeyId, ProfileId, ProtocolKind, SnippetId,
 };
 
 use super::Database;
@@ -370,6 +370,67 @@ impl Database {
             .map_err(|e| write_error("Failed to commit transaction", e))?;
         Ok(value)
     }
+
+    // --- Command_Snippet CRUD (Requirement 19) ----------------------------
+
+    /// Insert a new snippet. On any failure the database is left unchanged.
+    pub fn insert_snippet(&self, snippet: &CommandSnippet) -> Result<(), DomainError> {
+        self.with_write_tx(|tx| {
+            tx.execute(
+                "INSERT INTO snippets (id, name, command, protocol) VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![
+                    snippet.id.to_string(),
+                    snippet.name,
+                    snippet.command,
+                    snippet.protocol.map(|p| protocol_to_str(p).to_string()),
+                ],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Read every snippet, ordered by name for a stable listing.
+    pub fn list_snippets(&self) -> Result<Vec<CommandSnippet>, DomainError> {
+        let conn = self.connection();
+        let mut stmt = conn
+            .prepare("SELECT id, name, command, protocol FROM snippets ORDER BY name")
+            .map_err(|e| read_error("Failed to prepare snippet listing", e))?;
+        let rows = stmt
+            .query_map([], map_snippet_row)
+            .map_err(|e| read_error("Failed to query snippets", e))?;
+        collect_rows(rows, "Failed to read snippet row")
+    }
+
+    /// Update an existing snippet's mutable fields. Fails if no snippet with the
+    /// given id exists; on failure the prior state is retained.
+    pub fn update_snippet(&self, snippet: &CommandSnippet) -> Result<(), DomainError> {
+        self.with_write_tx(|tx| {
+            let affected = tx.execute(
+                "UPDATE snippets SET name = ?2, command = ?3, protocol = ?4 WHERE id = ?1",
+                rusqlite::params![
+                    snippet.id.to_string(),
+                    snippet.name,
+                    snippet.command,
+                    snippet.protocol.map(|p| protocol_to_str(p).to_string()),
+                ],
+            )?;
+            if affected == 0 {
+                return Err(RepoError::NotFound {
+                    entity: "snippet",
+                    id: snippet.id.to_string(),
+                });
+            }
+            Ok(())
+        })
+    }
+
+    /// Delete a snippet by id. Returns whether a snippet was removed.
+    pub fn delete_snippet(&self, id: SnippetId) -> Result<bool, DomainError> {
+        self.with_write_tx(|tx| {
+            let affected = tx.execute("DELETE FROM snippets WHERE id = ?1", [id.to_string()])?;
+            Ok(affected > 0)
+        })
+    }
 }
 
 // --- Row model + mapping ---------------------------------------------------
@@ -583,6 +644,28 @@ fn protocol_from_str(s: &str) -> Result<ProtocolKind, DomainError> {
             format!("unknown protocol `{other}`"),
         )),
     }
+}
+
+/// Map a `snippets` row (id, name, command, protocol) into a [`CommandSnippet`].
+fn map_snippet_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<Result<CommandSnippet, DomainError>> {
+    let id_str: String = row.get(0)?;
+    let name: String = row.get(1)?;
+    let command: String = row.get(2)?;
+    let protocol_str: Option<String> = row.get(3)?;
+    Ok((|| {
+        let protocol = match protocol_str.as_deref() {
+            None => None,
+            Some(s) => Some(protocol_from_str(s)?),
+        };
+        Ok(CommandSnippet {
+            id: SnippetId::from(parse_uuid(&id_str, "snippet.id")?),
+            name,
+            command,
+            protocol,
+        })
+    })())
 }
 
 // --- Shared helpers --------------------------------------------------------

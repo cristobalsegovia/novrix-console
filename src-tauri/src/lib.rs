@@ -179,6 +179,11 @@ pub fn run() {
             ipc::list_profiles,
             ipc::save_credential,
             ipc::has_credential,
+            // Snippets
+            ipc::save_snippet,
+            ipc::update_snippet,
+            ipc::delete_snippet,
+            ipc::list_snippets,
             // Folders
             ipc::create_folder,
             ipc::rename_folder,

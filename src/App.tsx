@@ -40,6 +40,7 @@ import PromptDialog from "./components/PromptDialog";
 import TabBar, { type OpenSession } from "./components/TabBar";
 import SessionView from "./components/SessionView";
 import KeyManager from "./components/KeyManager";
+import SnippetsPanel from "./components/SnippetsPanel";
 import {
   activateTab,
   asDomainError,
@@ -104,6 +105,8 @@ function App() {
   const [profiles, setProfiles] = useState<ConnectionProfile[]>([]);
   const [protocols, setProtocols] = useState<ProtocolKind[]>([]);
   const [serialPorts, setSerialPorts] = useState<string[]>([]);
+  // Whether the initial profile/folder load is still in flight (Req 18.4).
+  const [treeLoading, setTreeLoading] = useState(true);
 
   const [editor, setEditor] = useState<EditorState>({ kind: "empty" });
   const [selectedProfileId, setSelectedProfileId] = useState<ProfileId | null>(
@@ -134,6 +137,8 @@ function App() {
 
   // The global SSH key manager modal (task 21.3), opened from the header.
   const [keysOpen, setKeysOpen] = useState(false);
+  // The command-snippets modal (task 27.5), opened from the header.
+  const [snippetsOpen, setSnippetsOpen] = useState(false);
 
   // Host-key / certificate trust prompts (task 26.3). The backend emits
   // `hostkey://prompt` when an unknown SSH host key / RDP certificate is seen
@@ -163,6 +168,8 @@ function App() {
       setProfiles(p);
     } catch (err) {
       setBanner(asDomainError(err).message);
+    } finally {
+      setTreeLoading(false);
     }
   }, []);
 
@@ -462,6 +469,13 @@ function App() {
           >
             SSH keys
           </button>
+          <button
+            type="button"
+            className="btn btn-small"
+            onClick={() => setSnippetsOpen(true)}
+          >
+            Snippets
+          </button>
         </div>
       </header>
 
@@ -480,7 +494,12 @@ function App() {
       ) : null}
 
       <div className="body">
-        <aside className="sidebar">
+        <aside className="sidebar" style={{ position: "relative" }}>
+          {treeLoading ? (
+            <div className="busy-overlay">
+              <span className="spinner" aria-hidden="true" /> Loading…
+            </div>
+          ) : null}
           <ProfileTree
             folders={folders}
             profiles={profiles}
@@ -593,6 +612,16 @@ function App() {
       ) : null}
 
       {keysOpen ? <KeyManager onClose={() => setKeysOpen(false)} /> : null}
+
+      {snippetsOpen ? (
+        <SnippetsPanel
+          activeSession={(() => {
+            const s = sessions.find((x) => x.id === activeSessionId);
+            return s ? { id: s.id, protocol: s.kind } : null;
+          })()}
+          onClose={() => setSnippetsOpen(false)}
+        />
+      ) : null}
 
       {newFolderParent ? (
         <PromptDialog

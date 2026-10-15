@@ -18,7 +18,8 @@ pub use error::{
     RegistrationError, ScriptError, TransferError, ValidationError,
 };
 pub use model::{
-    AuthConfig, BaudRate, ConnectionProfile, CredentialKey, DataBits, ExportFile, Folder, FolderId,
-    HostKeyPolicy, KeyId, KeyType, ManagedKey, Parity, ProfileId, ProtocolKind, ProtocolParams,
-    Resolution, Session, SessionId, SessionState, StopBits,
+    AuthConfig, BaudRate, CommandSnippet, ConnectionProfile, CredentialKey, DataBits, ExportFile,
+    Folder, FolderId, HostKeyPolicy, KeyId, KeyType, ManagedKey, Parity, ProfileId, ProtocolKind,
+    ProtocolParams, Resolution, Session, SessionId, SessionState, SnippetDraft, SnippetId,
+    StopBits,
 };

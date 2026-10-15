@@ -98,9 +98,10 @@ use crate::connection::{
 };
 use crate::credential::{CredentialStore, KeyringCredentialStore, KeyringSecureStore, SecureStore};
 use crate::domain::{
-    AuthConfig, ConnectionProfile, CredentialError, CredentialKey, DomainError, Folder, FolderId,
-    HostKeyPolicy, KeyError, KeyId, KeyType, ManagedKey, ProfileId, ProtocolError, ProtocolKind,
-    ProtocolParams, SessionId, SessionState, TransferError,
+    AuthConfig, CommandSnippet, ConnectionProfile, CredentialError, CredentialKey, DomainError,
+    Folder, FolderId, HostKeyPolicy, KeyError, KeyId, KeyType, ManagedKey, ProfileId,
+    ProtocolError, ProtocolKind, ProtocolParams, SessionId, SessionState, SnippetDraft, SnippetId,
+    TransferError,
 };
 use crate::keys::{resolve_private_key_openssh, DefaultKeyManager, KeyManager, SecretStore};
 use crate::logging::{FileSinkFactory, SessionLogger, SystemClock};
@@ -1198,6 +1199,51 @@ pub async fn list_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<ConnectionProfile>, DomainError> {
     state.connection.run(|m| m.database().list_profiles()).await
+}
+
+// ---------------------------------------------------------------------------
+// Command_Snippet commands (Requirement 19)
+// ---------------------------------------------------------------------------
+
+/// Create a Command_Snippet with name/command validation (Requirement 19.1, 19.2).
+#[tauri::command]
+pub async fn save_snippet(
+    state: State<'_, AppState>,
+    draft: SnippetDraft,
+) -> Result<CommandSnippet, DomainError> {
+    state.connection.run(move |m| m.create_snippet(draft)).await
+}
+
+/// Update an existing Command_Snippet, applying the same validation (Req 19.3).
+#[tauri::command]
+pub async fn update_snippet(
+    state: State<'_, AppState>,
+    id: SnippetId,
+    draft: SnippetDraft,
+) -> Result<CommandSnippet, DomainError> {
+    state
+        .connection
+        .run(move |m| m.update_snippet(id, draft))
+        .await
+}
+
+/// Delete a Command_Snippet after confirmation (Requirement 19.3).
+#[tauri::command]
+pub async fn delete_snippet(
+    state: State<'_, AppState>,
+    id: SnippetId,
+    confirmed: bool,
+) -> Result<(), DomainError> {
+    state
+        .connection
+        .run(move |m| m.delete_snippet(id, confirmed))
+        .await
+}
+
+/// List every stored Command_Snippet.
+#[tauri::command]
+pub async fn list_snippets(state: State<'_, AppState>) -> Result<Vec<CommandSnippet>, DomainError> {
+    state.connection.run(|m| m.list_snippets()).await
 }
 
 // ---------------------------------------------------------------------------

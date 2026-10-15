@@ -32,6 +32,7 @@ export type ProfileId = string;
 export type FolderId = string;
 export type SessionId = string;
 export type KeyId = string;
+export type SnippetId = string;
 export type CredentialKey = string;
 
 // ---------------------------------------------------------------------------
@@ -125,6 +126,26 @@ export interface Folder {
   name: string;
   parentId: FolderId | null;
   depth: number;
+}
+
+/**
+ * A saved, reusable command the user can send to a text-based session with one
+ * action (Requirement 19). Mirrors the backend `CommandSnippet` (camelCase).
+ * `protocol` null = any text-based protocol; otherwise it is offered only for
+ * sessions of that protocol.
+ */
+export interface CommandSnippet {
+  id: SnippetId;
+  name: string;
+  command: string;
+  protocol: ProtocolKind | null;
+}
+
+/** The submitted fields for creating/updating a snippet (id is backend-assigned). */
+export interface SnippetDraft {
+  name: string;
+  command: string;
+  protocol: ProtocolKind | null;
 }
 
 /**
@@ -498,6 +519,33 @@ export function forgetHostKey(
   kind: HostKeyKind,
 ): Promise<void> {
   return invoke("forget_host_key", { host, port, kind });
+}
+
+// ---------------------------------------------------------------------------
+// Command snippets (Requirement 19)
+// ---------------------------------------------------------------------------
+
+/** List every stored snippet. */
+export function listSnippets(): Promise<CommandSnippet[]> {
+  return invoke("list_snippets");
+}
+
+/** Create a snippet (rejects an empty name or command via a validation error). */
+export function saveSnippet(draft: SnippetDraft): Promise<CommandSnippet> {
+  return invoke("save_snippet", { draft });
+}
+
+/** Update an existing snippet, with the same validation as creation. */
+export function updateSnippet(
+  id: SnippetId,
+  draft: SnippetDraft,
+): Promise<CommandSnippet> {
+  return invoke("update_snippet", { id, draft });
+}
+
+/** Delete a snippet after confirmation (pass confirmed = true). */
+export function deleteSnippet(id: SnippetId, confirmed: boolean): Promise<void> {
+  return invoke("delete_snippet", { id, confirmed });
 }
 
 // ---------------------------------------------------------------------------

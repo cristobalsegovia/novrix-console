@@ -1144,3 +1144,194 @@ select[aria-invalid="true"] {
 textarea {
   font: inherit;
 }
+
+/* ========================================================================= */
+/* Visual polish (Requirement 18)                                            */
+/* Additive refinements over the existing token system: a consistent, visible */
+/* focus indicator; smooth interaction transitions; a reusable busy spinner;  */
+/* subtle elevation; and a richer empty state. No tokens or layout are redone. */
+/* ========================================================================= */
+
+/* --- Accessible, consistent focus indicator (Req 18.5) ------------------- */
+/* A single visible ring for every interactive control, in both themes. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+/* Drop the default outline only where we provide the focus-visible ring. */
+:where(button, a, input, select, textarea):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --- Smooth interaction feedback ---------------------------------------- */
+/* Short, subtle transitions make hover/press feel responsive, not abrupt.  */
+.btn,
+.tree-row,
+.tree-action,
+.tab,
+input,
+select,
+textarea {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
+    transform 60ms ease;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Primary action gets a faint accent glow on hover for clear affordance. */
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Inputs: a clear focused state beyond the outline (accent-tinted border). */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+}
+
+/* Honour reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* --- Subtle elevation for panels and dialogs ---------------------------- */
+.app-header {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 60%, transparent);
+}
+.modal {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* --- Reusable busy spinner (Req 18.4) ----------------------------------- */
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: nvx-spin 0.7s linear infinite;
+}
+@keyframes nvx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A full-pane busy overlay for async loads (Req 18.4). */
+.busy-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: color-mix(in srgb, var(--surface-0) 55%, transparent);
+  color: var(--text-muted);
+  z-index: 5;
+}
+
+/* --- Inline field reveal/password row ----------------------------------- */
+/* Lay a text input and its adjacent small button on one line (password Show,
+   snippet Send, etc.) without bespoke per-use styles. */
+.field-inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.field-inline input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Richer empty state (Req 18.6) -------------------------------------- */
+.main-placeholder {
+  gap: 0.5rem;
+}
+.main-placeholder::before {
+  content: "";
+  width: 42px;
+  height: 42px;
+  margin-bottom: 0.5rem;
+  border-radius: 10px;
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      color-mix(in srgb, var(--accent) 70%, transparent),
+      transparent 70%
+    );
+  opacity: 0.6;
+}
+.main-placeholder p:first-of-type {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ---- Command snippets panel (Requirement 19) --------------------------- */
+.snippets-modal {
+  width: min(680px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.snippet-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.snippet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.snippet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.snippet-name {
+  font-weight: 600;
+}
+.snippet-command {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42ch;
+}
+.snippet-tag {
+  align-self: flex-start;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+.snippet-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: none;
+}

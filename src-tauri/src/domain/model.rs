@@ -81,6 +81,11 @@ uuid_newtype! {
     KeyId
 }
 
+uuid_newtype! {
+    /// Stable identifier for a [`CommandSnippet`].
+    SnippetId
+}
+
 /// Opaque reference to a secret held in OS Secure_Storage.
 ///
 /// A `CredentialKey` is never a secret itself — it only names where the
@@ -265,6 +270,34 @@ pub struct Folder {
     pub parent_id: Option<FolderId>,
     /// `0..=9` (root = 0); nesting is capped at 10 levels.
     pub depth: u8,
+}
+
+/// A saved, reusable command (or text) a user can send to a text-based Session
+/// with one action (Requirement 19). Stored in the connection database
+/// alongside Folders and Connection_Profiles — never in Secure_Storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandSnippet {
+    /// Stable UUID identifier.
+    pub id: SnippetId,
+    /// Human-readable name shown in the snippet list. Non-empty.
+    pub name: String,
+    /// The command text sent verbatim to the Session. Non-empty.
+    pub command: String,
+    /// When set, the snippet applies only to Sessions of this protocol; `None`
+    /// means it applies to any text-based protocol (SSH, Telnet, Serial).
+    pub protocol: Option<ProtocolKind>,
+}
+
+/// The submitted fields for creating or updating a [`CommandSnippet`] (the id
+/// is assigned by the manager). Validated before any write (Requirement 19.2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnippetDraft {
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub protocol: Option<ProtocolKind>,
 }
 
 /// Connection state of a [`Session`].

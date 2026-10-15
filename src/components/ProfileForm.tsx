@@ -627,7 +627,15 @@ function ProfileForm(props: ProfileFormProps) {
           Cancel
         </button>
         <button type="submit" className="btn btn-primary" disabled={saving}>
-          {saving ? "Saving…" : isEditing ? "Save changes" : "Create profile"}
+          {saving ? (
+            <>
+              <span className="spinner" aria-hidden="true" /> Saving…
+            </>
+          ) : isEditing ? (
+            "Save changes"
+          ) : (
+            "Create profile"
+          )}
         </button>
       </div>
     </form>
