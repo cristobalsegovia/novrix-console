@@ -118,15 +118,19 @@ pub enum ProtocolKind {
     Rdp,
 }
 
-/// SSH host-key verification policy for an SSH profile.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Trust policy for a server's identity key/certificate: an SSH host key, or an
+/// RDP server's TLS certificate. The same three choices drive both, so SSH
+/// profiles and RDP profiles share this type (see [`ProtocolParams`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum HostKeyPolicy {
-    /// Prompt the user to confirm the first time an unknown host key is seen.
+    /// Prompt the user to confirm the first time an unknown key/certificate is
+    /// seen. The safe default and the value older profiles deserialize to.
+    #[default]
     PromptOnUnknown,
-    /// Accept any host key without prompting (insecure; opt-in).
+    /// Accept any key/certificate without prompting (insecure; opt-in).
     AcceptAny,
-    /// Reject any host key that is not already known.
+    /// Reject any key/certificate that is not already known.
     Strict,
 }
 
@@ -212,6 +216,12 @@ pub enum ProtocolParams {
     Rdp {
         /// Optional requested resolution, bounded `640x480..=7680x4320`.
         resolution: Option<Resolution>,
+        /// Trust policy for the RDP server's TLS certificate. Defaults to
+        /// [`HostKeyPolicy::PromptOnUnknown`] and `#[serde(default)]` so RDP
+        /// profiles saved before this field existed still deserialize (they
+        /// simply get the safe prompting default).
+        #[serde(default)]
+        cert_policy: HostKeyPolicy,
     },
 }
 

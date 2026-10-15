@@ -1104,6 +1104,7 @@ mod tests {
                 credential_key: CredentialKey::new("profile/rdp/secret-ref"),
             },
             ProtocolParams::Rdp {
+                cert_policy: HostKeyPolicy::Strict,
                 resolution: Some(Resolution {
                     width: 1920,
                     height: 1080,
@@ -1117,7 +1118,10 @@ mod tests {
             None,
             ProtocolKind::Rdp,
             AuthConfig::None,
-            ProtocolParams::Rdp { resolution: None },
+            ProtocolParams::Rdp {
+                resolution: None,
+                cert_policy: HostKeyPolicy::PromptOnUnknown,
+            },
         );
         db.insert_profile(&without_res).unwrap();
         assert_eq!(

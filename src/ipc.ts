@@ -91,7 +91,12 @@ export type ProtocolParams =
       parity: Parity;
       stop_bits: StopBits;
     }
-  | { protocol: "rdp"; resolution: Resolution | null };
+  | {
+      protocol: "rdp";
+      resolution: Resolution | null;
+      /** Trust policy for the RDP server's TLS certificate. */
+      cert_policy: HostKeyPolicy;
+    };
 
 // ---------------------------------------------------------------------------
 // Structs (camelCase fields)
@@ -454,6 +459,23 @@ export function respondHostKeyPrompt(
   accept: boolean,
 ): Promise<void> {
   return invoke("respond_host_key_prompt", { requestId, accept });
+}
+
+/**
+ * Forget a previously-trusted SSH host key / RDP certificate for `host:port`
+ * (Requirement 4.8 recovery path). When a server's key or certificate changes,
+ * the connection is rejected outright and is never silently re-prompted; this
+ * clears the stored fingerprint so the next connect treats the host as unknown
+ * again and can accept the new key via {@link listenHostKeyPrompt}. `kind` is
+ * `"ssh-host-key"` or `"rdp-certificate"`. Idempotent — forgetting an absent
+ * entry succeeds.
+ */
+export function forgetHostKey(
+  host: string,
+  port: number,
+  kind: HostKeyKind,
+): Promise<void> {
+  return invoke("forget_host_key", { host, port, kind });
 }
 
 // ---------------------------------------------------------------------------

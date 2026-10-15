@@ -57,6 +57,16 @@ impl TrustKind {
             TrustKind::RdpCertificate => "rdp-certificate",
         }
     }
+
+    /// Parse the wire string the frontend sends (the inverse of [`as_str`]),
+    /// or `None` for an unrecognised value.
+    pub fn from_wire(s: &str) -> Option<Self> {
+        match s {
+            "ssh-host-key" => Some(TrustKind::SshHostKey),
+            "rdp-certificate" => Some(TrustKind::RdpCertificate),
+            _ => None,
+        }
+    }
 }
 
 /// The outcome of the pure [`decide_trust`] rule.
@@ -225,9 +235,10 @@ impl KnownHostsStore {
     /// This is the documented recovery path for a **changed** key: once the old
     /// entry is forgotten the host looks unknown again, so the normal
     /// prompt/strict flow applies on the next connect. Idempotent — forgetting
-    /// an absent entry is a no-op success. Wiring a user-facing "forget host
-    /// key" command on top of this is left as a follow-up (see the IPC layer's
-    /// `TODO`).
+    /// an absent entry is a no-op success. The user-facing "forget host key /
+    /// certificate" command (`forget_host_key` in the IPC layer) is wired on
+    /// top of this, so a user who sees a changed-key rejection can clear the old
+    /// entry and reconnect to accept the new one.
     pub fn forget(&self, host: &str, port: u16, kind: TrustKind) -> Result<(), DomainError> {
         self.with_conn("forget a known-host entry", |conn| {
             conn.execute(
@@ -382,6 +393,26 @@ mod tests {
         assert_eq!(s.get("h", 22, TrustKind::SshHostKey).unwrap(), None);
         // Forgetting again is a no-op success.
         s.forget("h", 22, TrustKind::SshHostKey).unwrap();
+    }
+
+    #[test]
+    fn trust_kind_wire_strings_round_trip() {
+        // The `forget_host_key` command parses the wire string the frontend
+        // sends; `from_wire` must be the exact inverse of `as_str` and reject
+        // anything else (so a bad kind is a validation error, not a silent miss).
+        for kind in [TrustKind::SshHostKey, TrustKind::RdpCertificate] {
+            assert_eq!(TrustKind::from_wire(kind.as_str()), Some(kind));
+        }
+        assert_eq!(
+            TrustKind::from_wire("ssh-host-key"),
+            Some(TrustKind::SshHostKey)
+        );
+        assert_eq!(
+            TrustKind::from_wire("rdp-certificate"),
+            Some(TrustKind::RdpCertificate)
+        );
+        assert_eq!(TrustKind::from_wire("nope"), None);
+        assert_eq!(TrustKind::from_wire(""), None);
     }
 
     #[test]

@@ -991,6 +991,19 @@ fn ssh_host_key_policy(profile: &ConnectionProfile) -> HostKeyPolicy {
     }
 }
 
+/// Resolve a profile's RDP certificate [`HostKeyPolicy`] from its protocol
+/// params.
+///
+/// An RDP profile carries `ProtocolParams::Rdp { cert_policy, .. }`. A profile
+/// routed here with non-RDP params is a programming error (dispatch is by
+/// kind); default to the safest prompting policy rather than panicking.
+fn rdp_cert_policy(profile: &ConnectionProfile) -> HostKeyPolicy {
+    match &profile.protocol_params {
+        ProtocolParams::Rdp { cert_policy, .. } => *cert_policy,
+        _ => HostKeyPolicy::PromptOnUnknown,
+    }
+}
+
 /// Construct the RDP protocol with the `ironrdp` connector (carrying the real
 /// certificate verifier), and the credential source adapter.
 ///
@@ -1347,17 +1360,16 @@ pub async fn open_session(
         }
         ProtocolKind::Rdp => {
             // Task 26.3: the RDP certificate verifier reuses the SSH trust logic
-            // under TrustKind::RdpCertificate. RDP has no profile HostKeyPolicy
-            // field (it is SSH-only on the data model), so the certificate trust
-            // uses the safe default: prompt on an unknown cert, reject a changed
-            // one. TODO(policy): give RDP profiles their own cert policy field if
-            // an AcceptAny/Strict choice is ever needed for RDP.
+            // under TrustKind::RdpCertificate, driven by the profile's own
+            // certificate trust policy (ProtocolParams::Rdp { cert_policy }):
+            // prompt on an unknown cert / proceed on a known match / reject a
+            // changed one, honouring AcceptAny or Strict when the profile asks.
             let cert_decider = Arc::new(IpcHostKeyVerifier::new(
                 Arc::clone(&state.known_hosts),
                 state.host_key_prompts.clone(),
                 profile.host.clone(),
                 profile.port,
-                HostKeyPolicy::PromptOnUnknown,
+                rdp_cert_policy(&profile),
                 TrustKind::RdpCertificate,
             ));
             let cert_verifier: Arc<dyn RdpCertVerifier> = Arc::new(IpcRdpCertVerifier {
@@ -1454,6 +1466,34 @@ pub async fn respond_host_key_prompt(
 ) -> Result<(), DomainError> {
     state.host_key_prompts.resolve(&request_id, accept);
     Ok(())
+}
+
+/// Forget a previously-trusted SSH host key / RDP certificate for `host:port`
+/// (the recovery path for a changed-key rejection).
+///
+/// When a server's key or certificate changes, the trust rule rejects the
+/// connection as `HostKeyDeclined` and never silently re-prompts — a changed
+/// key is a hard fail. This command lets the user explicitly clear the stored
+/// fingerprint so the host looks unknown again; the next connect then runs the
+/// normal prompt/strict flow and can accept the new key. Idempotent: forgetting
+/// an absent entry succeeds.
+///
+/// `kind` is the wire string `"ssh-host-key"` or `"rdp-certificate"`; an
+/// unrecognised value is rejected with a validation error.
+#[tauri::command]
+pub async fn forget_host_key(
+    state: State<'_, AppState>,
+    host: String,
+    port: u16,
+    kind: String,
+) -> Result<(), DomainError> {
+    let trust_kind = TrustKind::from_wire(&kind).ok_or_else(|| {
+        DomainError::new(
+            "validation.trustKind",
+            "Unknown trust kind (expected \"ssh-host-key\" or \"rdp-certificate\").",
+        )
+    })?;
+    state.known_hosts.forget(&host, port, trust_kind)
 }
 
 // ---------------------------------------------------------------------------

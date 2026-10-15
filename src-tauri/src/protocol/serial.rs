@@ -701,6 +701,7 @@ mod tests {
                     _ => ProtocolParams::Rdp {
                         resolution: resolution
                             .map(|(width, height)| crate::domain::Resolution { width, height }),
+                        cert_policy: crate::domain::HostKeyPolicy::PromptOnUnknown,
                     },
                 };
 

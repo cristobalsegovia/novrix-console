@@ -135,7 +135,7 @@ pub fn validate_resolution(requested: Option<Resolution>) -> Result<Resolution, 
 /// as an `InvalidParameter` on `protocol` rather than silently defaulting.
 fn requested_resolution(cfg: &ResolvedProfile) -> Result<Option<Resolution>, ProtocolError> {
     match &cfg.profile.protocol_params {
-        ProtocolParams::Rdp { resolution } => Ok(*resolution),
+        ProtocolParams::Rdp { resolution, .. } => Ok(*resolution),
         _ => Err(ProtocolError::InvalidParameter {
             parameter: "protocol".to_string(),
             message: "RDP protocol invoked with non-RDP profile parameters".to_string(),
@@ -1083,7 +1083,8 @@ async fn connect_sequence(
     // The upgrade's rustls verifier consults `cert_verifier` with the server
     // leaf certificate's fingerprint (task 26.3); a declined/changed cert aborts
     // the handshake here, before CredSSP, so no session is produced.
-    let (tls_stream, server_public_key) = tls_upgrade(initial_stream, host, cert_verifier).await?;
+    let (tls_stream, server_public_key) =
+        tls_upgrade(initial_stream, host, Arc::clone(&cert_verifier)).await?;
 
     let upgraded = ironrdp_tokio::mark_as_upgraded(should_upgrade, &mut connector);
 
@@ -1106,7 +1107,9 @@ async fn connect_sequence(
     // whatever URL/scheme it yields. See [`SspiNetworkClient`] for the exact
     // framing contract.
     let server_name: ServerName = host.into();
-    let mut network_client = SspiNetworkClient;
+    let mut network_client = SspiNetworkClient {
+        cert_verifier: Arc::clone(&cert_verifier),
+    };
     let connection_result = ironrdp_tokio::connect_finalize(
         upgraded,
         &mut upgraded_framed,
@@ -1162,7 +1165,9 @@ async fn connect_sequence(
 /// Every failure is surfaced as a [`ConnectorError`] (via [`ConnectorErrorExt`])
 /// so it flows through the normal connect error path. No secret material is
 /// logged here — only transport-level diagnostics (host/scheme/length).
-struct SspiNetworkClient;
+struct SspiNetworkClient {
+    cert_verifier: Arc<dyn RdpCertVerifier>,
+}
 
 impl SspiNetworkClient {
     /// TCP round-trip to a KDC. `data` is written as-is (it is already
@@ -1237,7 +1242,11 @@ impl SspiNetworkClient {
     /// verifier the RDP channel uses (see the SECURITY TODO on
     /// [`IronRdpConnector`]); a KDC-proxy is reached over the same trust-on-
     /// first-use posture as the host until certificate pinning lands.
-    async fn send_http(url: &url::Url, data: &[u8]) -> ConnectorResult<Vec<u8>> {
+    async fn send_http(
+        url: &url::Url,
+        data: &[u8],
+        cert_verifier: &Arc<dyn RdpCertVerifier>,
+    ) -> ConnectorResult<Vec<u8>> {
         let host = url
             .host_str()
             .ok_or_else(|| ConnectorError::general("KDC-proxy URL has no host"))?
@@ -1262,7 +1271,7 @@ impl SspiNetworkClient {
             .map_err(|e| ConnectorError::custom("KDC-proxy connect", e))?;
 
         if https {
-            let tls = tls_connect_any(tcp, &host).await?;
+            let tls = tls_connect_verified(tcp, &host, cert_verifier).await?;
             Self::http_exchange(tls, &host, &path, data).await
         } else {
             Self::http_exchange(tcp, &host, &path, data).await
@@ -1335,7 +1344,12 @@ impl AsyncNetworkClient for SspiNetworkClient {
                     Self::send_udp(&network_request.url, &network_request.data).await
                 }
                 NetworkProtocol::Http | NetworkProtocol::Https => {
-                    Self::send_http(&network_request.url, &network_request.data).await
+                    Self::send_http(
+                        &network_request.url,
+                        &network_request.data,
+                        &self.cert_verifier,
+                    )
+                    .await
                 }
             }
         })
@@ -1432,12 +1446,21 @@ fn decode_chunked_body(mut data: &[u8]) -> ConnectorResult<Vec<u8>> {
     Ok(out)
 }
 
-/// Open a TLS stream to `host` over an existing TCP stream using the same
-/// accept-any verifier as the RDP channel. Shared by the KDC-proxy HTTPS path.
-async fn tls_connect_any(tcp: TcpStream, host: &str) -> ConnectorResult<TlsStream<TcpStream>> {
+/// Open a TLS stream to a KDC-proxy over an existing TCP stream, verifying the
+/// proxy's certificate with the *same* fingerprint-pinning [`RdpCertVerifier`]
+/// the RDP server channel uses (task: KDC-proxy certificate trust). A proxy
+/// whose certificate the trust decision rejects fails the handshake, so the
+/// Kerberos leg is never carried over an unverified TLS connection.
+async fn tls_connect_verified(
+    tcp: TcpStream,
+    host: &str,
+    cert_verifier: &Arc<dyn RdpCertVerifier>,
+) -> ConnectorResult<TlsStream<TcpStream>> {
     let config = rustls::ClientConfig::builder()
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(danger::NoCertificateVerification))
+        .with_custom_certificate_verifier(Arc::new(danger::TrustStoreCertVerifier::new(
+            Arc::clone(cert_verifier),
+        )))
         .with_no_client_auth();
     let connector = TlsConnector::from(Arc::new(config));
     let dns = pki_types::ServerName::try_from(host.to_owned())
@@ -1668,10 +1691,10 @@ fn decode_input_event(event: &[u8]) -> Result<Vec<Operation>, ProtocolError> {
 ///   checks remain asserted because RDP's trust anchor is the fingerprint, not a
 ///   PKI chain (self-signed RDP certificates are the norm) — the fingerprint
 ///   pinning is what provides continuity-of-identity, exactly like SSH host keys.
-/// - [`NoCertificateVerification`] is retained **only** for the optional
-///   Kerberos **KDC-proxy** HTTPS leg ([`tls_connect_any`]), which is a
-///   different endpoint than the RDP server and is out of scope for RDP host
-///   trust. It is never used for the RDP server channel.
+/// - The optional Kerberos **KDC-proxy** HTTPS leg ([`tls_connect_verified`])
+///   is held to the **same** fingerprint-pinning [`RdpCertVerifier`] trust as
+///   the RDP server channel, so a KDC-proxy certificate is verified, never
+///   blindly accepted.
 mod danger {
     use std::sync::Arc;
 
@@ -1746,50 +1769,7 @@ mod danger {
         }
     }
 
-    /// A `rustls` certificate verifier that accepts any server certificate.
-    ///
-    /// Retained only for the Kerberos KDC-proxy HTTPS leg (`tls_connect_any`),
-    /// which is a separate endpoint from the RDP server and out of scope for RDP
-    /// host-key trust. It is never installed on the RDP server channel.
-    #[derive(Debug)]
-    pub(super) struct NoCertificateVerification;
-
-    impl ServerCertVerifier for NoCertificateVerification {
-        fn verify_server_cert(
-            &self,
-            _: &pki_types::CertificateDer<'_>,
-            _: &[pki_types::CertificateDer<'_>],
-            _: &pki_types::ServerName<'_>,
-            _: &[u8],
-            _: pki_types::UnixTime,
-        ) -> Result<ServerCertVerified, Error> {
-            Ok(ServerCertVerified::assertion())
-        }
-
-        fn verify_tls12_signature(
-            &self,
-            _: &[u8],
-            _: &pki_types::CertificateDer<'_>,
-            _: &DigitallySignedStruct,
-        ) -> Result<HandshakeSignatureValid, Error> {
-            Ok(HandshakeSignatureValid::assertion())
-        }
-
-        fn verify_tls13_signature(
-            &self,
-            _: &[u8],
-            _: &pki_types::CertificateDer<'_>,
-            _: &DigitallySignedStruct,
-        ) -> Result<HandshakeSignatureValid, Error> {
-            Ok(HandshakeSignatureValid::assertion())
-        }
-
-        fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-            all_schemes()
-        }
-    }
-
-    /// The TLS signature schemes advertised by both verifiers.
+    /// The TLS signature schemes advertised by the certificate verifier.
     fn all_schemes() -> Vec<SignatureScheme> {
         vec![
             SignatureScheme::RSA_PKCS1_SHA1,
@@ -2051,7 +2031,10 @@ mod tests {
             auth: AuthConfig::Password {
                 credential_key: CredentialKey::new("profile/1/password"),
             },
-            protocol_params: ProtocolParams::Rdp { resolution },
+            protocol_params: ProtocolParams::Rdp {
+                resolution,
+                cert_policy: crate::domain::HostKeyPolicy::PromptOnUnknown,
+            },
             logging_enabled: false,
             log_path: None,
             connect_timeout_secs: timeout_secs,
@@ -2449,7 +2432,10 @@ mod tests {
             auth: AuthConfig::Password {
                 credential_key: CredentialKey::new("it/rdp/password"),
             },
-            protocol_params: ProtocolParams::Rdp { resolution: None },
+            protocol_params: ProtocolParams::Rdp {
+                resolution: None,
+                cert_policy: crate::domain::HostKeyPolicy::PromptOnUnknown,
+            },
             logging_enabled: false,
             log_path: None,
             connect_timeout_secs: 20,

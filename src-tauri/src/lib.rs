@@ -195,6 +195,7 @@ pub fn run() {
             ipc::send_input,
             ipc::active_tab,
             ipc::respond_host_key_prompt,
+            ipc::forget_host_key,
             // Keys
             ipc::generate_key,
             ipc::import_key,

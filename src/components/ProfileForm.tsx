@@ -65,7 +65,7 @@ function defaultParams(
         stop_bits: "one",
       };
     case "rdp":
-      return { protocol: "rdp", resolution: null };
+      return { protocol: "rdp", resolution: null, cert_policy: "promptOnUnknown" };
   }
 }
 
@@ -458,6 +458,32 @@ function ProfileForm(props: ProfileFormProps) {
               </option>
             ))}
           </select>
+        </div>
+      ) : null}
+
+      {params.protocol === "rdp" ? (
+        <div className="field">
+          <label htmlFor="pf-rdp-certpolicy">Certificate policy</label>
+          <select
+            id="pf-rdp-certpolicy"
+            value={params.cert_policy}
+            onChange={(e) =>
+              setParams({
+                protocol: "rdp",
+                resolution: params.resolution,
+                cert_policy: e.target.value as HostKeyPolicy,
+              })
+            }
+          >
+            {HOST_KEY_POLICIES.map((p) => (
+              <option key={p} value={p}>
+                {HOST_KEY_LABELS[p]}
+              </option>
+            ))}
+          </select>
+          <p className="field-hint">
+            How to trust the RDP server's TLS certificate on first connect.
+          </p>
         </div>
       ) : null}
 

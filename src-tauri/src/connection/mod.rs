@@ -2204,7 +2204,10 @@ mod tests {
                     parity: crate::domain::Parity::None,
                     stop_bits: crate::domain::StopBits::One,
                 },
-                ProtocolKind::Rdp => ProtocolParams::Rdp { resolution: None },
+                ProtocolKind::Rdp => ProtocolParams::Rdp {
+                    resolution: None,
+                    cert_policy: crate::domain::HostKeyPolicy::PromptOnUnknown,
+                },
             }
         }
 

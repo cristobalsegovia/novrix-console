@@ -470,7 +470,13 @@ mod property_tests {
                     stop_bits: StopBits::One,
                 },
             )),
-            Just((ProtocolKind::Rdp, ProtocolParams::Rdp { resolution: None })),
+            Just((
+                ProtocolKind::Rdp,
+                ProtocolParams::Rdp {
+                    resolution: None,
+                    cert_policy: crate::domain::HostKeyPolicy::PromptOnUnknown,
+                },
+            )),
         ]
     }
 
