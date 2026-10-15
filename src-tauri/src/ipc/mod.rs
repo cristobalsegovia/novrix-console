@@ -1525,6 +1525,26 @@ pub async fn active_tab(state: State<'_, AppState>) -> Result<Option<SessionId>,
     Ok(state.sessions.active_tab().await)
 }
 
+/// A read-only snapshot of a session's accumulated remote output.
+///
+/// The per-session read loop appends every chunk it pulls off the remote to an
+/// independent output buffer *and* fans the same chunk out to the live
+/// `session://{id}/output` stream. A freshly mounted terminal view races that
+/// stream: the backend may have already emitted the login banner (and any early
+/// output) before the frontend finishes registering its event listener, so
+/// those bytes would be lost. This command lets the view **replay** the buffer
+/// on mount — subscribe to the live stream first, read this snapshot, write it,
+/// then flush any live bytes that arrived past the snapshot — so nothing is
+/// dropped and nothing is duplicated. Returns an empty vector for an unknown or
+/// not-yet-producing session.
+#[tauri::command]
+pub async fn session_output(
+    state: State<'_, AppState>,
+    id: SessionId,
+) -> Result<Vec<u8>, DomainError> {
+    Ok(state.sessions.output_snapshot(id).await.unwrap_or_default())
+}
+
 /// Answer a pending host-key / certificate trust prompt (task 26.3).
 ///
 /// The backend emits a `hostkey://prompt` event (with a `requestId`) when an

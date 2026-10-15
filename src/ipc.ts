@@ -451,6 +451,19 @@ export function activeTab(): Promise<SessionId | null> {
   return invoke("active_tab");
 }
 
+/**
+ * A snapshot of a session's accumulated remote output, as raw bytes.
+ *
+ * A terminal view fetches this on mount to **replay** any output the backend
+ * emitted before the live `session://{id}/output` listener was registered (the
+ * login banner, early prompts). Returns an empty array for an unknown or
+ * not-yet-producing session. See {@link listenSessionOutput} for the live
+ * stream this complements.
+ */
+export function sessionOutput(id: SessionId): Promise<number[]> {
+  return invoke("session_output", { id });
+}
+
 // ---------------------------------------------------------------------------
 // Host-key / certificate trust prompt (task 26.3)
 // ---------------------------------------------------------------------------

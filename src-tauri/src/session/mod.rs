@@ -347,8 +347,12 @@ impl SessionManager {
                         // forward for the live `session://{id}/output` stream.
                         read_sink.emit(id, &bytes);
                     }
-                    Ok(None) | Err(_) => {
-                        // Clean EOF or transport error: this session is done.
+                    Ok(None) => {
+                        let mut s = read_state.write().await;
+                        *s = SessionState::Disconnected;
+                        break;
+                    }
+                    Err(_) => {
                         let mut s = read_state.write().await;
                         *s = SessionState::Disconnected;
                         break;

@@ -35,7 +35,13 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { asDomainError, listenSessionOutput, sendInput, type SessionId } from "../ipc";
+import {
+  asDomainError,
+  listenSessionOutput,
+  sendInput,
+  sessionOutput,
+  type SessionId,
+} from "../ipc";
 
 interface TerminalViewProps {
   /** The session whose output stream this terminal renders. */
@@ -113,20 +119,73 @@ function TerminalView({ sessionId, onError }: TerminalViewProps) {
     });
 
     // Requirement 10.1: write every remote-output chunk into the terminal.
+    //
+    // Mount races the backend: the read loop may have already emitted the login
+    // banner (and early prompts) onto `session://{id}/output` before this
+    // listener is registered, so a naive subscribe-only view shows a black
+    // screen. We fix the race with a subscribe-first, then-replay handshake:
+    //
+    //   1. Register the live listener immediately. Until the snapshot has been
+    //      written, live chunks are *queued* instead of written, so ordering is
+    //      preserved and nothing is dropped.
+    //   2. Fetch `sessionOutput` — the full buffer the read loop has
+    //      accumulated so far — and write it. Any live chunk already in that
+    //      snapshot would otherwise be written twice.
+    //   3. Flush the queue, skipping exactly the prefix the snapshot already
+    //      covered (tracked by byte length), so no byte is duplicated or lost.
     let disposed = false;
     let unlisten: (() => void) | null = null;
-    listenSessionOutput(sessionId, (data) => {
+    let replayed = false;
+    // Live chunks seen before the snapshot replay completes, buffered in order.
+    const pending: number[][] = [];
+    // Bytes already shown via the snapshot; the queue flush skips this prefix.
+    let snapshotLen = 0;
+
+    const writeChunk = (data: number[]) => {
       // xterm accepts a Uint8Array and runs it through its VT parser, which
       // handles ANSI sequences and discards malformed ones (Req 10.3/10.4).
       term.write(new Uint8Array(data));
+    };
+
+    listenSessionOutput(sessionId, (data) => {
+      if (replayed) {
+        writeChunk(data);
+      } else {
+        // Not replayed yet: queue so these land after the snapshot, in order.
+        pending.push(data);
+      }
     })
       .then((fn) => {
         if (disposed) {
           // Unmounted before the listener resolved: tear it down immediately.
           fn();
-        } else {
-          unlisten = fn;
+          return;
         }
+        unlisten = fn;
+        // Snapshot replay (step 2). The listener is already live, so any chunk
+        // arriving during this await is captured in `pending`.
+        return sessionOutput(sessionId).then((snapshot) => {
+          if (disposed) return;
+          snapshotLen = snapshot.length;
+          if (snapshotLen > 0) writeChunk(snapshot);
+
+          // Step 3: flush queued live chunks, skipping the `snapshotLen`-byte
+          // prefix the snapshot already rendered. The queue and the snapshot
+          // share the same leading bytes (same read loop, same order), so we
+          // drop whole/partial chunks until the prefix is consumed, then write
+          // the remainder.
+          let skip = snapshotLen;
+          for (const chunk of pending) {
+            if (skip >= chunk.length) {
+              skip -= chunk.length;
+              continue;
+            }
+            writeChunk(skip > 0 ? chunk.slice(skip) : chunk);
+            skip = 0;
+          }
+          pending.length = 0;
+          replayed = true;
+        });
       })
       .catch((err) => {
         onErrorRef.current?.(asDomainError(err).message);

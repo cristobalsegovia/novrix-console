@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 070bf1ed40481618331a6aa285d41a5bf0151436d09a50abb64dfcdf9e56df69 # shrinks to name = "", protocol = Ssh, host = "a", port = 1, timeout = 1, host2 = "a", port2 = 1

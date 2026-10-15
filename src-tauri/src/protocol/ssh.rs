@@ -498,9 +498,13 @@ impl SshProtocol {
         let connect = client::connect(config, (host.as_str(), port), handler);
         let handle = match tokio::time::timeout(timeout, connect).await {
             // Elapsed the connect budget (Requirement 4.6 / Property 12).
-            Err(_elapsed) => return Err(ProtocolError::Timeout),
+            Err(_elapsed) => {
+                return Err(ProtocolError::Timeout);
+            }
             Ok(Ok(handle)) => handle,
-            Ok(Err(err)) => return Err(map_connect_error(err)),
+            Ok(Err(err)) => {
+                return Err(map_connect_error(err));
+            }
         };
         let mut handle = handle;
 
@@ -809,7 +813,8 @@ impl SessionConn for SshSession {
         // a channel close is a clean end of stream (`Ok(None)`); other control
         // messages (window adjust, requests, exit status) are skipped.
         loop {
-            match reader.wait().await {
+            let msg = reader.wait().await;
+            match msg {
                 Some(ChannelMsg::Data { data }) => {
                     return Ok(Some(data.to_vec()));
                 }
