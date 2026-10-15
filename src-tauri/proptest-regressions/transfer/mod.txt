@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e48d51e998690fef346c471324ed9520daadf151cc1e14c0314ffa976da70096 # cleanup: interruption near the final chunk boundary
+cc 56f7f8f1028966c7e538226284866ff91d82d2ec953c53d687d8c191d225aa59 # progress: near-100% input that rounds to 100
+cc cb16b02320c54a51ef5deac6e0a92c56b18c7493cd7b93d0af57d10e5783d46c # shrinks to total = 482400, raw_points = [137484]

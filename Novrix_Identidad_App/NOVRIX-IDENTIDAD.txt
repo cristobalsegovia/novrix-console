@@ -1,0 +1,59 @@
+IDENTIDAD VISUAL DE NOVRIX TECH, LO NECESARIO PARA UNA APP DE ESCRITORIO
+Manual de identidad v1.0 (agosto 2026). Paquete del 14 de octubre de 2026.
+
+ICONO DE APLICACION
+  novrix-icon.ico       Windows. 6 tamanos dentro: 16, 32, 48, 64, 128 y 256.
+                        El favicon.ico del kit oficial solo trae 16x16 y no
+                        sirve para una app; este se genero para eso.
+  novrix-icon.icns      macOS. Tipos ic07 a ic14 (128 a 1024, con los @2x).
+  novrix-appicon-N.png  Suelto, por si el empaquetador los pide asi.
+                        16, 32, 48, 64, 180, 192, 512 y 1024 son los oficiales
+                        del kit. 128 y 256 se derivaron del 1024 con LANCZOS.
+
+LOGOS (SVG vectorial, escala sin perder nitidez)
+  novrix-logo-horizontal.svg          sobre fondo claro
+  novrix-logo-horizontal-reverso.svg  sobre fondo oscuro
+  novrix-logo-apilado.svg             cuando el espacio es mas alto que ancho
+  novrix-logo-apilado-reverso.svg
+  novrix-isotipo-navy.svg             la N sola, fondo claro
+  novrix-isotipo-blanco.svg           la N sola, fondo oscuro
+  novrix-isotipo-acento.svg           la N sola en cian
+  Hay PNG de los tres primeros por si hace falta mapa de bits.
+
+  El isotipo es una N con un guion bajo cian. El guion es el acento de la
+  marca: no se recolorea ni se quita.
+
+PALETA
+  Deep Blue       #0F172A    fondo oscuro, barras, pie
+  Electric Cyan   #06B6D4    el acento de la marca
+  Steel Gray      #64748B    texto secundario
+  Light BG        #F8FAFC    fondo claro
+  Pure White      #FFFFFF
+  (secundarios del sitio: texto #475569, bordes #E2E8F0, sobre navy #CBD5E1)
+
+  El manual prohibe sombras duras, biseles y efectos 3D.
+
+CONTRASTE, IMPORTANTE PARA LA INTERFAZ
+  Medido con la formula de la WCAG. El cian de la marca NO sirve como texto ni
+  como relleno de boton con texto blanco encima:
+
+    #FFFFFF sobre #06B6D4     2.43    NO cumple AA (hace falta 4.5)
+    #06B6D4 sobre #FFFFFF     2.43    NO cumple AA
+    #06B6D4 sobre #0F172A     7.35    cumple AAA, aqui si
+    #0E7490 sobre #FFFFFF     5.36    este es el cian para texto en claro
+    #0F172A sobre #06B6D4     7.35    boton cian con texto navy
+
+  Para un boton de accion sobre fondo claro: o texto navy sobre el cian de
+  marca, o blanco sobre #0E7490. El sitio web arrastra este defecto; la app no
+  tiene por que heredarlo.
+
+TIPOGRAFIA
+  Inter. Van los seis pesos que usa la marca, en OTF para empaquetar:
+  Light 300, Regular 400, Medium 500, SemiBold 600, Bold 700, ExtraBold 800.
+  Titulos en 800, cuerpo en 400, etiquetas en 600 mayusculas con interletraje
+  amplio. Inter se distribuye bajo SIL Open Font License, se puede incrustar.
+
+AREA DE SEGURIDAD Y TAMANOS MINIMOS
+  Estan en el manual de 10 paginas del kit oficial
+  (01_Guia_de_Marca/Guia_Identidad_Visual_Novrix_Tech.pdf). No se repiten aqui
+  para no citarlos de memoria y equivocarse.

@@ -1,0 +1,1146 @@
+/*
+ * Novrix Console — Novrix brand theme (task 22.1).
+ *
+ * Task 21 shipped a neutral, token-driven baseline so task 22 could reskin the
+ * app by overriding the CSS custom properties alone — no component markup
+ * changes. This file now carries the real Novrix Tech identity: the Inter type
+ * family, the Deep-Blue/Light brand palette across a dark (default) and a light
+ * theme, and the WCAG-contrast rules for the brand cyan. The structural rules
+ * below are unchanged from task 21; only the tokens and a few flat-UI tweaks
+ * were adjusted.
+ *
+ * ## Brand palette (design.md › Branding & Visual Identity)
+ *   Deep Blue / Navy  #0F172A   dark surfaces, bars, terminal canvas
+ *   Electric Cyan     #06B6D4   brand accent — AAA ONLY on navy
+ *   Dark Cyan         #0E7490   cyan text/affordances on light backgrounds
+ *   Steel Gray        #64748B   secondary text
+ *   Light BG          #F8FAFC   light background
+ *   Pure White        #FFFFFF   light surfaces / on-navy text
+ *   On-navy text      #CBD5E1   muted text on navy
+ *   Body text (light) #475569   muted text on light
+ *   Borders (light)   #E2E8F0
+ *
+ * ## WCAG contrast rules (critical — accessibility, Requirement 1.x)
+ *   The brand cyan #06B6D4 has a known contrast defect. Measured ratios:
+ *     #FFFFFF on #06B6D4 = 2.43  → FAILS AA  (never white text on cyan fill)
+ *     #06B6D4 on #FFFFFF = 2.43  → FAILS AA  (never cyan text on white)
+ *     #06B6D4 on #0F172A = 7.35  → AAA       (cyan accent only over navy)
+ *     #0E7490 on #FFFFFF = 5.36  → AA        (dark cyan for cyan text on light)
+ *     #0F172A on #06B6D4 = 7.35  → AAA       (navy text on a cyan button)
+ *   Therefore:
+ *     - Dark theme: --accent = cyan #06B6D4, button text = navy #0F172A
+ *       (navy-on-cyan 7.35 AAA). Accent is only ever shown over navy surfaces.
+ *     - Light theme: --accent = dark cyan #0E7490, button text = white #FFFFFF
+ *       (white-on-#0E7490 5.36 AA); cyan text/affordances use #0E7490.
+ *     - The brand cyan #06B6D4 is NEVER used as text, nor as a button fill
+ *       beneath white text.
+ *
+ * ## Flat UI
+ *   The brand manual prohibits hard shadows, bevels, and 3D effects. The UI is
+ *   kept flat: solid fills, 1px borders, and the one unavoidable overlay scrim
+ *   is a flat translucent fill (no drop shadow).
+ */
+
+/* ---- Inter type family (six OTF weights, 300–800) ----------------------- */
+/* Vite resolves the relative url() paths and fingerprints/bundles the OTFs. */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-Light.otf") format("opentype");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-Regular.otf") format("opentype");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-Medium.otf") format("opentype");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-SemiBold.otf") format("opentype");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-Bold.otf") format("opentype");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-ExtraBold.otf") format("opentype");
+}
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Dark theme (default): Deep-Blue surfaces, cyan accent on navy. ---- */
+
+  /* Deep Blue #0F172A base, lightened in steps for panels/rows/hover. The
+     terminal canvas (--surface-0) stays true navy per the design. */
+  --surface-0: #0f172a; /* Deep Blue — app background + terminal canvas */
+  --surface-1: #111c33; /* bars / panels */
+  --surface-2: #1b2742; /* raised rows / inputs */
+  --surface-3: #243352; /* hover */
+  --border: #334155; /* steel-gray-derived divider */
+  --text: #ffffff; /* Pure White on navy */
+  --text-muted: #cbd5e1; /* on-navy muted text */
+
+  /* Accent = brand cyan. Over navy it is AAA (7.35). Button text on the cyan
+     fill is navy (#0F172A on #06B6D4 = 7.35 AAA) — NEVER white (2.43, fails). */
+  --accent: #06b6d4; /* Electric Cyan — only ever shown over navy */
+  --accent-text: #0f172a; /* navy text on a cyan button (AAA) */
+
+  --danger: #ef4444;
+  --danger-text: #ffffff; /* white on #ef4444 ≈ 4.0; large/bold button text */
+  --success: #22c55e;
+
+  /* Focus ring = cyan on navy (AAA, clearly visible against dark surfaces). */
+  --focus-ring: #06b6d4;
+
+  --radius: 6px;
+  --gap: 0.75rem;
+
+  /* Inter is the brand UI typeface; system fonts are the loading fallback. */
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ---- Light theme: Light BG surfaces, DARK cyan (#0E7490) for cyan text ---- */
+/* Opt-in via data-theme="light" on <html> (toggled from the header). The brand
+   cyan #06B6D4 is unsafe on light surfaces, so the accent downshifts to the
+   darker cyan #0E7490 and action buttons use white-on-#0E7490 (5.36 AA). */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-0: #f8fafc; /* Light BG — app background */
+  --surface-1: #ffffff; /* Pure White bars / panels */
+  --surface-2: #f1f5f9; /* raised rows / inputs */
+  --surface-3: #e2e8f0; /* hover / borders-derived */
+  --border: #e2e8f0; /* light borders */
+  --text: #0f172a; /* navy body text on light (AAA) */
+  --text-muted: #475569; /* steel-gray body text (AA) */
+
+  /* Accent = dark cyan #0E7490 so cyan text/affordances meet AA on light.
+     Action-button text is white on #0E7490 (5.36 AA). */
+  --accent: #0e7490; /* dark cyan — safe for text/affordances on light */
+  --accent-text: #ffffff; /* white on #0E7490 (AA) */
+
+  --danger: #dc2626; /* darker red for AA on light surfaces */
+  --danger-text: #ffffff;
+  --success: #15803d;
+
+  /* Focus ring = dark cyan (visible against light surfaces, AA). */
+  --focus-ring: #0e7490;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--surface-0);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ---- Layout ------------------------------------------------------------- */
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+/* Brand lockup: the "N_" isotype next to the product name. The isotype SVG is
+   theme-swapped by App.tsx (white isotype on the dark header, navy on light);
+   its cyan underscore is never recolored. */
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-isotype {
+  display: block;
+  height: 1.5rem;
+  width: auto;
+  flex: none;
+}
+
+.app-title {
+  /* Headings use Inter ExtraBold 800 per the brand typography spec. */
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 300px;
+  min-width: 220px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-1);
+  overflow-y: auto;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.main-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem;
+}
+
+.main-placeholder-note {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.editor-pane {
+  padding: 1.25rem;
+  max-width: 640px;
+}
+
+/* ---- Banner ------------------------------------------------------------- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface-1));
+  border-bottom: 1px solid var(--danger);
+}
+
+.banner-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+/* ---- Tree --------------------------------------------------------------- */
+
+.tree {
+  padding: 0.5rem;
+}
+
+.tree-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tree-root,
+.tree-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius);
+}
+
+.tree-row:hover {
+  background: var(--surface-3);
+}
+
+.tree-row.selected {
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface-2));
+}
+
+.tree-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.1rem 0;
+  font: inherit;
+}
+
+.tree-icon {
+  width: 1.1em;
+  flex: none;
+  text-align: center;
+}
+
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-meta {
+  margin-left: auto;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.tree-row-actions {
+  display: flex;
+  gap: 0.1rem;
+  opacity: 0;
+}
+
+.tree-row:hover .tree-row-actions,
+.tree-row:focus-within .tree-row-actions {
+  opacity: 1;
+}
+
+.profile-row .tree-action {
+  opacity: 0;
+}
+
+.profile-row:hover .tree-action,
+.profile-row:focus-within .tree-action {
+  opacity: 1;
+}
+
+.tree-action {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.tree-action:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.tree-empty {
+  color: var(--text-muted);
+  padding: 0.75rem 0.5rem;
+  font-size: 0.9em;
+}
+
+/* ---- Forms -------------------------------------------------------------- */
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.form-header h2 {
+  margin: 0 0 0.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-row {
+  display: flex;
+  gap: var(--gap);
+}
+
+.field-row > .field {
+  flex: 1;
+}
+
+.field-port {
+  max-width: 180px;
+}
+
+.field label {
+  /* Brand label style: Inter SemiBold 600, uppercase, wide letter-spacing. */
+  font-size: 0.72em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.field-checkbox {
+  justify-content: flex-end;
+}
+
+.field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text);
+  /* Checkbox labels read as prose, not the uppercase field-label treatment. */
+  font-size: 1em;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.82em;
+}
+
+.field-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8em;
+}
+
+.field-empty {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.field-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  margin: 0;
+}
+
+.field-group legend {
+  padding: 0 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.form-error {
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--danger) 20%, var(--surface-2));
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* ---- Buttons ------------------------------------------------------------ */
+
+.btn {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn:hover {
+  background: var(--surface-3);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-small {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.85em;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: var(--danger-text);
+  border-color: var(--danger);
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 85%, #000);
+}
+
+/* ---- Modal -------------------------------------------------------------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modal-message {
+  margin: 0;
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Host-key / certificate fingerprint shown in the trust prompt (task 26.3). */
+.hostkey-fingerprint {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-2, var(--surface-1));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
+}
+
+/* ---- Sessions: tabs + views (task 21.2) --------------------------------- */
+
+.session-area {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0.35rem 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  overflow-x: auto;
+  flex: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.4rem 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface-2);
+  max-width: 220px;
+}
+
+.tab.active {
+  background: var(--surface-0);
+  border-color: var(--accent);
+}
+
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-state {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  flex: none;
+  background: var(--text-muted);
+}
+
+.tab-state-connecting {
+  background: var(--accent);
+}
+
+.tab-state-connected {
+  background: var(--success);
+}
+
+.tab-state-disconnected {
+  background: var(--danger);
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.tab-close:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.session-stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.session-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.session-view[hidden] {
+  display: none;
+}
+
+.session-actionbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  flex: none;
+}
+
+.session-actionbar-title {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.session-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* ---- Terminal view ------------------------------------------------------ */
+
+.terminal-view {
+  position: absolute;
+  inset: 0;
+  padding: 0.25rem;
+  background: var(--surface-0);
+}
+
+.terminal-view .xterm {
+  height: 100%;
+}
+
+/* ---- RDP view ----------------------------------------------------------- */
+
+.rdp-view {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rdp-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+.rdp-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  background: color-mix(in srgb, var(--surface-0) 82%, transparent);
+  color: var(--text);
+  text-align: center;
+  padding: 2rem;
+}
+
+.rdp-overlay-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.rdp-overlay-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* ---- Header actions (task 21.3) ---------------------------------------- */
+
+.app-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ---- Shared bits (task 21.3) ------------------------------------------- */
+
+.btn-active {
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface-2));
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.form-notice {
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  margin: 0;
+}
+
+.field-inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.field-inline input {
+  flex: 1;
+}
+
+.field-actions-inline {
+  justify-content: flex-end;
+  flex: none;
+}
+
+/* ---- Session action bar tools ------------------------------------------ */
+
+.session-actionbar-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* ---- Inline session panels (transfer / script) ------------------------- */
+
+.session-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  max-height: 55%;
+  overflow-y: auto;
+  flex: none;
+}
+
+.session-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-panel-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.session-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* ---- File transfer panel ----------------------------------------------- */
+
+.transfer-nav {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.transfer-nav input {
+  flex: 1;
+}
+
+.transfer-listing {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.transfer-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.transfer-row {
+  display: grid;
+  grid-template-columns: 1fr 6rem 11rem auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.transfer-row:last-child {
+  border-bottom: none;
+}
+
+.transfer-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+}
+
+.transfer-name:disabled {
+  cursor: default;
+}
+
+.transfer-icon {
+  flex: none;
+}
+
+.transfer-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-size,
+.transfer-modified {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.transfer-modified {
+  text-align: left;
+}
+
+.transfer-actions {
+  text-align: right;
+}
+
+.transfer-io {
+  display: flex;
+  gap: var(--gap);
+}
+
+.transfer-io > .field {
+  flex: 1;
+}
+
+/* ---- Progress bar ------------------------------------------------------- */
+
+.transfer-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.progress-track {
+  height: 0.6rem;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.transfer-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.transfer-progress-label {
+  font-size: 0.82em;
+  color: var(--text-muted);
+}
+
+/* ---- Script runner panel ----------------------------------------------- */
+
+.script-editor {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  resize: vertical;
+  min-height: 7rem;
+}
+
+.script-editor:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.script-outcome {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.script-outcome-success {
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-2));
+  border-color: var(--success);
+}
+
+.script-outcome-failure {
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
+  border-color: var(--danger);
+}
+
+.script-outcome-failure p {
+  margin: 0 0 0.25rem;
+}
+
+.script-outcome-cause {
+  color: var(--text-muted);
+  font-size: 0.88em;
+}
+
+/* ---- Key manager modal ------------------------------------------------- */
+
+.modal-wide {
+  max-width: 720px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.keys-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.keys-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.keys-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.keys-item:last-child {
+  border-bottom: none;
+}
+
+.keys-item-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.keys-item-type {
+  font-weight: 700;
+  font-size: 0.8em;
+  flex: none;
+}
+
+.keys-item-pub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.keys-item-badge {
+  flex: none;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.05rem 0.3rem;
+}
+
+.keys-item-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex: none;
+}
+
+textarea {
+  font: inherit;
+}

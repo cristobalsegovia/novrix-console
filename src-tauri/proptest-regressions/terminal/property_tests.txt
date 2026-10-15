@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc a099961bdb2ead80f63533f556e9f930a564a4b5a3e9ccb6d174a21d5cddb24a # shrinks to ops = [MoveTo { row: 5, col: 11 }, Print('!')]
+cc b3c6b56b78024b2d366465eba7d7c228370a13c7a72855d081c6eaacae5c39d3 # shrinks to fragments = [[97], [97], [97], [97], [97]], malformed = [27], inject_at = Index(0)

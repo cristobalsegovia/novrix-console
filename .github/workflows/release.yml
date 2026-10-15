@@ -1,0 +1,172 @@
+# Release pipeline for Novrix Console (Tauri 2).
+#
+# Builds, signs, notarizes (macOS) and packages per-platform installers, then
+# publishes them to a GitHub Release. Code signing is OS-specific and uses the
+# native toolchain of each platform, so macOS artifacts are built on a macOS
+# runner and Windows artifacts on a Windows runner — a single runner cannot sign
+# for both. See design.md -> "Build, Signing & Distribution".
+#
+# Trigger: pushing a version tag like v1.2.3.
+#
+# -----------------------------------------------------------------------------
+# REQUIRED GITHUB SECRETS
+# -----------------------------------------------------------------------------
+# macOS (Developer ID signing + notarization + stapling — Tauri does all three
+#        automatically when these env vars are present during the build):
+#   APPLE_CERTIFICATE          Base64 of the exported Developer ID Application .p12
+#   APPLE_CERTIFICATE_PASSWORD Password used when exporting that .p12
+#   APPLE_SIGNING_IDENTITY     e.g. "Developer ID Application: Your Name (TEAMID)"
+#
+#   Notarization — provide EITHER the App Store Connect API key (preferred for
+#   CI; no app-specific password, no 2FA friction) ...
+#     APPLE_API_ISSUER         App Store Connect API Issuer ID (UUID)
+#     APPLE_API_KEY            Key ID of the API key
+#     APPLE_API_KEY_PATH       Path to the AuthKey_<KeyID>.p8 file on the runner
+#                              (written from a secret at build time — see job below)
+#   ... OR the Apple ID credentials:
+#     APPLE_ID                 Apple ID email
+#     APPLE_PASSWORD           App-specific password for that Apple ID
+#     APPLE_TEAM_ID            10-char Apple Developer Team ID
+#   (If both sets are configured, the API key takes precedence.)
+#   Optional: APPLE_API_KEY_CONTENT — the .p8 contents, written to disk so the
+#             API-key notarization path works on an ephemeral runner.
+#
+# Windows (signing is wired to secrets, NOT hardcoded). Two documented paths:
+#   A) Azure Trusted Signing / "Azure Artifact Signing" (managed service, no
+#      hardware token; Microsoft's recommended route for installers distributed
+#      outside the Store). Needs an Azure AD app registration with access to the
+#      Trusted Signing account:
+#        AZURE_TENANT_ID
+#        AZURE_CLIENT_ID
+#        AZURE_CLIENT_SECRET
+#        AZURE_SIGNING_ENDPOINT        e.g. https://wus2.codesigning.azure.net/
+#        AZURE_CODE_SIGNING_ACCOUNT    Trusted Signing account name
+#        AZURE_CERT_PROFILE            Certificate profile name
+#   B) Commercial OV certificate (DigiCert/Sectigo/Comodo). Since June 2023 the
+#      private key must live on a hardware token or cloud HSM, which a hosted
+#      GitHub runner cannot access directly — in practice you call the CA's cloud
+#      signing tool/HSM from the runner. Wire its credentials via secrets, e.g.:
+#        WINDOWS_SIGN_TOOL_CREDENTIALS  (provider-specific; keep it a secret)
+#
+# NOTE on SmartScreen: an EV certificate NO LONGER grants instant SmartScreen
+# reputation (Microsoft removed that). With OV or Azure Trusted Signing the app
+# earns reputation over time. The Microsoft Store (MSIX) is the only genuinely
+# free route (Microsoft re-signs after certification) and can be used as a
+# complementary distribution channel.
+#
+# The Windows signing step below is DISABLED by default (guarded by a repo
+# variable) so the pipeline still produces unsigned Windows artifacts until the
+# signing credentials are provisioned. Set the repo *variable* ENABLE_WINDOWS_SIGNING
+# to "true" (Settings -> Secrets and variables -> Actions -> Variables) once the
+# Azure secrets above exist, to activate real signing.
+# -----------------------------------------------------------------------------
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Needed so tauri-action can create / upload to the GitHub Release.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & release (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # --- macOS: write the App Store Connect API key to disk (if provided) ---
+      # tauri-action reads APPLE_API_KEY_PATH; we materialize the .p8 from a
+      # secret so the API-key notarization path works on the ephemeral runner.
+      - name: Write App Store Connect API key (macOS)
+        if: matrix.platform == 'macos-latest' && secrets.APPLE_API_KEY_CONTENT != ''
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/private_keys"
+          echo "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/private_keys/AuthKey.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/private_keys/AuthKey.p8" >> "$GITHUB_ENV"
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+
+      # --- Build + bundle + sign (+ notarize + staple on macOS) ---
+      # tauri-action runs `tauri build`, which:
+      #   * macOS: signs the .app with the Developer ID identity, submits for
+      #            notarization, and staples the ticket to the .dmg — all driven
+      #            by the APPLE_* env vars below.
+      #   * Windows: produces .msi (WiX) and .exe (NSIS) installers.
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # macOS signing (Developer ID) — ignored on the Windows runner.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+          # macOS notarization via App Store Connect API key (preferred).
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          # APPLE_API_KEY_PATH is exported by the previous step into GITHUB_ENV.
+
+          # macOS notarization fallback via Apple ID (used if no API key is set).
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Novrix Console ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          # macOS: build a universal (Intel + Apple Silicon) binary.
+          # No-op on the Windows runner.
+          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
+
+      # --- Windows: sign the produced installers (Azure Trusted Signing) -------
+      # Disabled until credentials exist. Flip repo variable ENABLE_WINDOWS_SIGNING
+      # to "true" after provisioning the AZURE_* secrets above. For a commercial
+      # OV certificate instead, replace this step with the CA's cloud-HSM signing
+      # tool and feed it WINDOWS_SIGN_TOOL_CREDENTIALS from secrets.
+      - name: Sign Windows installers (Azure Trusted Signing)
+        if: matrix.platform == 'windows-latest' && vars.ENABLE_WINDOWS_SIGNING == 'true'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          # Sign every installer the Tauri bundler produced.
+          files-folder: ${{ github.workspace }}\src-tauri\target\release\bundle
+          files-folder-filter: msi,exe
+          files-folder-recurse: true

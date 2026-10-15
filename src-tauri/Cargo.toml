@@ -1,0 +1,125 @@
+[package]
+name = "novrix-console"
+version = "0.1.0"
+description = "Novrix Console - unified remote connection manager (SSH, Telnet, Serial, RDP)"
+authors = ["Novrix Tech"]
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# The library is required for mobile targets and keeps the core reusable/testable.
+[lib]
+name = "novrix_console_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# --- Tauri runtime + IPC ---
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+
+# --- Async runtime ---
+tokio = { version = "1", features = ["full"] }
+# Enables `async fn` in object-safe (`dyn`) traits, required by the uniform
+# `Protocol`/`SessionConn` interface which is used behind `Box<dyn ...>`.
+async-trait = "0.1"
+
+# --- Protocol / I/O crates (core logic lands in later tasks) ---
+russh = "0.54"
+russh-sftp = "2"
+serialport = "4"
+# RDP: the `ironrdp` meta-crate with the connect + active-session + input +
+# graphics + virtual-channel machinery enabled (default features alone only
+# expose PDU *types*). The sans-I/O connector is driven over tokio via
+# `ironrdp-async` + `ironrdp-tokio`, and the TLS upgrade the security
+# negotiation delegates to the caller uses `tokio-rustls`.
+ironrdp = { version = "0.11", features = ["connector", "session", "graphics", "input", "svc", "dvc"] }
+
+# --- Secrets ---
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
+# --- SSH key generation / import / public-key export (Key_Manager) ---
+# Upstream RustCrypto `ssh-key`. russh 0.54 vendors a *forked* ssh-key
+# (`internal-russh-forked-ssh-key`) that is not a reusable public crate, so we
+# depend on upstream directly. It builds on `ssh-encoding`/`ssh-cipher` 0.2 and
+# `rand_core` 0.6 — the same lines already present via russh — so no new major
+# duplicates are introduced. Features: all three key types + encrypted-key
+# support (passphrase decrypt) + CSPRNG-backed generation.
+ssh-key = { version = "0.6", features = [
+    "ed25519",
+    "rsa",
+    "ecdsa",
+    "p256",
+    "p384",
+    "p521",
+    "encryption",
+    "getrandom",
+    "rand_core",
+    "std",
+] }
+# CSPRNG for key generation; `rand` 0.8 pairs with `rand_core` 0.6 (used by ssh-key).
+rand = "0.8"
+
+# --- Terminal emulation parsing ---
+vte = "0.15"
+
+# --- Local persistence ---
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+# --- Hashing (SHA-256 host-key / certificate fingerprints) ---
+# Already present in the dependency graph via russh / ssh-key; named directly so
+# the known-hosts store can compute an RDP TLS certificate's SHA-256 fingerprint
+# in the same shape as russh's SSH host-key fingerprints.
+sha2 = "0.10"
+base64 = "0.22"
+
+# --- Shared data model / serialization / errors ---
+uuid = { version = "1", features = ["v4", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+# Pinned to the 0.6 line so they resolve against `ironrdp-connector` 0.6 /
+# `ironrdp-session` 0.5 / `ironrdp-pdu` 0.5 — the exact versions the `ironrdp`
+# 0.11 meta-crate pulls in. (The 0.8/0.10 async lines target connector 0.8 /
+# pdu 0.7, whose `ClientConnector`/`ActiveStage`/`Framed` types are a different,
+# incompatible generation and would not interoperate with ironrdp 0.11.)
+ironrdp-async = "0.6"
+ironrdp-tokio = "0.6"
+tokio-rustls = "0.26"
+# `ironrdp-connector` 0.6's CredSSP/NLA stack (`sspi` 0.16) is written against
+# the *stable* RustCrypto line (`rsa` 0.9, `rand_core` 0.6, `p256` 0.13), which
+# `picky` 7.0.0-rc.15 also uses. Left to its own devices cargo selects a later
+# `picky` pre-release (rc.20) whose default features drag in the next-generation
+# RustCrypto RCs (`crypto-bigint` 0.7, `rsa` 0.10-rc), and `sspi` 0.16 fails to
+# compile against those. Pinning `picky` to rc.15 keeps the whole CredSSP crypto
+# graph on the stable line sspi was built for. `picky-krb` is pinned for the
+# same reason (its 0.11.3 patch pulls the next-gen RustCrypto RCs + `rand` 0.9).
+picky = "=7.0.0-rc.15"
+picky-krb = "=0.11.0"
+# Parse the server's TLS certificate to recover its SubjectPublicKeyInfo bit
+# string, which CredSSP binds the NLA exchange to (same approach as the upstream
+# ironrdp `screenshot` example). Already in the graph via `picky`.
+x509-cert = "0.2"
+# `TokioFramed::read_pdu` hands back `bytes::BytesMut`; name the crate directly
+# so the active-session read loop can work with it. (`ironrdp-async` re-exports
+# `bytes`, but depending on it explicitly keeps the import obvious.)
+bytes = "1"
+# The CredSSP `NetworkRequest.url` sspi yields is a `url::Url`; name the crate so
+# the Kerberos/KDC-proxy network client can read its scheme/host/port/path. This
+# is already in the graph via `sspi`/`picky`, so pinning to the resolved 2.5 line
+# introduces no new dependency — it only brings the type name into scope.
+url = "2.5"
+
+[dev-dependencies]
+proptest = "1"
+
+[profile.release]
+# Smaller, faster release binaries for the packaged desktop app.
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

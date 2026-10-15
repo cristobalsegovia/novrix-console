@@ -1,0 +1,1376 @@
+{
+  "pbtResults": {
+    "1.4 Write property test for the OS version gate": {
+      "status": "passed",
+      "lastRunTimestamp": 1792009445435
+    },
+    "13.2 Write property test for session isolation": {
+      "status": "passed",
+      "lastRunTimestamp": 1792009873924
+    },
+    "13.3 Write property test for bounded concurrency": {
+      "status": "passed",
+      "lastRunTimestamp": 1792009874989
+    },
+    "13.4 Write property test for exactly-one active tab": {
+      "status": "passed",
+      "lastRunTimestamp": 1792009876270
+    },
+    "13.5 Write property test for resource release on tab close": {
+      "status": "passed",
+      "lastRunTimestamp": 1792009876895
+    },
+    "6.2 Write property test for key generation validity": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010346364
+    },
+    "6.3 Write property test for key import validity": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010347112
+    },
+    "6.4 Write property test for encrypted-key passphrase storage": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010350711
+    },
+    "6.5 Write property test for public-key correspondence": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010351455
+    },
+    "6.7 Write property test for confirmed key deletion": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010355046
+    },
+    "6.8 Write property test for cancelled key deletion no-op": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010355755
+    },
+    "16.2 Write property test for post-enable-only capture": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010655772
+    },
+    "16.3 Write property test for disable-preserves-entries": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010656718
+    },
+    "16.4 Write property test for ISO-8601 timestamp prefix": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010658169
+    },
+    "16.5 Write property test for write-failure entry preservation": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010659071
+    },
+    "16.6 Write property test for invalid-destination handling": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010660005
+    },
+    "15.2 Write property test for transfer progress correctness": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010796656
+    },
+    "15.3 Write property test for incomplete-transfer cleanup": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010798059
+    },
+    "15.4 Write property test for failed-navigation listing preservation": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010798881
+    },
+    "18.2 Write property test for export containing no plaintext credentials": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010802128
+    },
+    "18.3 Write property test for export/import round-trip and additivity": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010803080
+    },
+    "18.4 Write property test for malformed-import rejection": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010804481
+    },
+    "18.5 Write property test for colliding-id import as new entries": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010805441
+    },
+    "18.6 Write property test for accurate added counts": {
+      "status": "passed",
+      "lastRunTimestamp": 1792010807302
+    },
+    "9.2 Write property test for Telnet timeout resolution": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014684928
+    },
+    "11.2 Write property test for RDP resolution bounds": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014714900
+    },
+    "8.2 Write property test for SSH port/timeout resolution": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014720041
+    },
+    "8.3 Write property test for missing-credentials abort": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014721810
+    },
+    "8.4 Write property test for bounded auth attempts": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014722385
+    },
+    "8.5 Write property test for declined host-key abort": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014723182
+    },
+    "10.2 Write property test for serial parameter validity": {
+      "status": "passed",
+      "lastRunTimestamp": 1792014743551
+    }
+  },
+  "executionHistory": {
+    "1.1 Create the Tauri 2 project skeleton and Rust/TS workspace layout": [
+      {
+        "executionId": "6170d5de-9e53-4687-9b41-6b3bad6283d1",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1791999399224
+      },
+      {
+        "executionId": "6170d5de-9e53-4687-9b41-6b3bad6283d1",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1791999945094
+      }
+    ],
+    "1.2 Define shared domain types and the structured error model": [
+      {
+        "executionId": "3f1df593-c7fd-4491-87ff-699360b66d35",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1791999972189
+      },
+      {
+        "executionId": "3f1df593-c7fd-4491-87ff-699360b66d35",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000173624
+      }
+    ],
+    "1.3 Implement the minimum-OS-version startup gate": [
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000206015
+      },
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000421215
+      }
+    ],
+    "2.1 Create the SQLite schema and connection/migration bootstrap": [
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000207456
+      },
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000422132
+      }
+    ],
+    "7.1 Define the Protocol / SessionConn traits and ProtocolRegistry": [
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000208130
+      },
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000423305
+      }
+    ],
+    "1. Scaffold Tauri 2 workspace and shared core foundation": [
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000421244
+      }
+    ],
+    "7. Implement the uniform Protocol_Engine interface and registry": [
+      {
+        "executionId": "e652712f-75af-4898-bc64-ac96db34173d",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000423332
+      }
+    ],
+    "2.2 Implement profile and folder repository functions": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000477016
+      },
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000898962
+      }
+    ],
+    "5.1 Implement the Credential_Store wrapper over keyring-rs": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000477856
+      },
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000900409
+      }
+    ],
+    "6.1 Implement key generation and import with validation": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000479262
+      },
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000901363
+      }
+    ],
+    "14.1 Implement the ANSI state machine, screen grid, and scrollback buffer": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000480031
+      },
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000902574
+      }
+    ],
+    "2. Implement SQLite persistence layer for profiles, folders, and settings": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000898995
+      }
+    ],
+    "5. Implement Credential_Store over OS Secure_Storage": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000900461
+      }
+    ],
+    "14. Implement Terminal_Emulator (ANSI parser + scrollback)": [
+      {
+        "executionId": "9a9109d2-5497-4f03-aca2-7c0f15055a3c",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792000902622
+      }
+    ],
+    "3.1 Implement profile validation and create/update": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001060518
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001225243
+      }
+    ],
+    "3.5 Implement profile deletion with confirmation": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001225964
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001399811
+      }
+    ],
+    "3.8 Implement folder create/rename with name validation": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001399116
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001567950
+      }
+    ],
+    "3.10 Implement profile move and folder move with hierarchy integrity": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001567130
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001793195
+      }
+    ],
+    "3.13 Implement folder deletion with confirmation and cascade": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001793817
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001973282
+      }
+    ],
+    "3. Implement Connection_Manager validation, profiles, and folder hierarchy": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001973324
+      }
+    ],
+    "4. Checkpoint - core domain and persistence": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001983128
+      }
+    ],
+    "8.1 Implement SSH establish with port/timeout resolution and auth": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001987487
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003181060
+      }
+    ],
+    "9.1 Implement Telnet establish with timeout and error handling": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001988922
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003181996
+      }
+    ],
+    "10.1 Implement serial open with parameter validation and port enumeration": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001989829
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003183462
+      }
+    ],
+    "11.1 Implement RDP establish with resolution bounds, timeout, and auth": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792001991012
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003184203
+      }
+    ],
+    "8. Implement SSH protocol over russh": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003181095
+      }
+    ],
+    "9. Implement Telnet protocol": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003182033
+      }
+    ],
+    "10. Implement Serial protocol over serialport": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003183493
+      }
+    ],
+    "11. Implement RDP protocol over ironrdp": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003184226
+      }
+    ],
+    "12. Checkpoint - credentials, keys, and all four protocols": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003190713
+      }
+    ],
+    "13.1 Implement session open/activate/close with per-session tasks": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003191662
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003499049
+      }
+    ],
+    "15.1 Implement remote listing, upload/download, progress, cancel, cleanup": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003193058
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003500015
+      }
+    ],
+    "16.1 Implement timestamped session logging with enable/disable and validation": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003194033
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003501421
+      }
+    ],
+    "17.1 Implement sequential command sending with wait-for-prompt and outcomes": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003195163
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003502222
+      }
+    ],
+    "13. Implement Session_Manager with tabs, isolation, and capacity": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003499086
+      }
+    ],
+    "15. Implement File_Transfer_Service over SFTP/SCP": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003500049
+      }
+    ],
+    "16. Implement Session_Logger": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003501448
+      }
+    ],
+    "17. Implement Script_Engine": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003502248
+      }
+    ],
+    "18.1 Implement versioned export and additive import": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003509594
+      },
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003794681
+      }
+    ],
+    "18. Implement configuration import/export in Connection_Manager": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003794710
+      }
+    ],
+    "19. Checkpoint - all core components implemented": [
+      {
+        "executionId": "70a29543-ba15-48ed-a8a8-d309512bbd12",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792003795441
+      }
+    ],
+    "20.1 Implement Tauri commands for all request/response operations": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792006114908
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792006992818
+      }
+    ],
+    "20.2 Implement Tauri event streams for session output and transfer progress": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792006991835
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792007289711
+      }
+    ],
+    "20. Implement the Tauri IPC bridge": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792007289745
+      }
+    ],
+    "21.1 Implement the profile/folder tree and profile create/edit/validation UI": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792007297872
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792007653454
+      }
+    ],
+    "21.2 Implement the tab bar and session views (terminal + RDP canvas)": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792007654511
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008048068
+      }
+    ],
+    "21.3 Implement file transfer, key management, logging, and script panels": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008046979
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008454247
+      }
+    ],
+    "22.1 Integrate brand fonts, logos, and the two-theme palette with contrast rules": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008453502
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008934023
+      }
+    ],
+    "21. Implement the React frontend": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008454281
+      }
+    ],
+    "22.2 Configure Tauri bundler application icons from brand assets": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792008932937
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009041211
+      }
+    ],
+    "22. Apply Novrix branding, theme, and WCAG-compliant palette": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009041240
+      }
+    ],
+    "23.1 Configure the tauri-action CI/CD release workflow with signing and notarization": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009042101
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009244025
+      }
+    ],
+    "23. Configure signed, notarized release pipeline": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009244061
+      }
+    ],
+    "24.3 Final checkpoint - ensure all tests pass": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009250997
+      },
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009269513
+      }
+    ],
+    "24. Final checkpoint, smoke and performance verification": [
+      {
+        "executionId": "c8b443f1-7b4e-47c1-8d3c-f88cc347ebbb",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009269543
+      }
+    ],
+    "1.4 Write property test for the OS version gate": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009363463
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009653754
+      }
+    ],
+    "2.3 Write unit tests for the repository layer": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009364854
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009655198
+      }
+    ],
+    "14.2 Write property test for ANSI interpretation vs reference model": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009366309
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009664076
+      }
+    ],
+    "7.2 Write property test for registered-equals-selectable": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009367212
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009659378
+      }
+    ],
+    "5.2 Write property test for credential-storage failure handling": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009368105
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009656081
+      }
+    ],
+    "5.3 Write property test for missing-credential retrieval": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009657027
+      }
+    ],
+    "5.4 Write property test for credential removal on profile delete": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009658429
+      }
+    ],
+    "7.3 Write property test for resource release on failed establish": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009660827
+      }
+    ],
+    "7.4 Write property test for incomplete-registration rejection": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009661728
+      }
+    ],
+    "7.5 Write unit test for the uniform-trait structural contract": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009663180
+      }
+    ],
+    "14.3 Write property test for malformed-sequence tolerance": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009665526
+      }
+    ],
+    "14.4 Write property test for resize dimension reporting": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009666478
+      }
+    ],
+    "14.5 Write property test for bounded FIFO scrollback": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009667446
+      }
+    ],
+    "6.6 Implement key deletion with confirmation": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009675714
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010475937
+      }
+    ],
+    "3.2 Write property test for faithful profile save": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009677163
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010490483
+      }
+    ],
+    "13.2 Write property test for session isolation": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792009677800
+      },
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010484824
+      }
+    ],
+    "6. Implement Key_Manager for SSH key generation and import": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010475967
+      }
+    ],
+    "6.2 Write property test for key generation validity": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010478350
+      }
+    ],
+    "6.3 Write property test for key import validity": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010478560
+      }
+    ],
+    "6.4 Write property test for encrypted-key passphrase storage": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010479180
+      }
+    ],
+    "6.5 Write property test for public-key correspondence": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010480640
+      }
+    ],
+    "6.7 Write property test for confirmed key deletion": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010481591
+      }
+    ],
+    "6.8 Write property test for cancelled key deletion no-op": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010482976
+      }
+    ],
+    "6.9 Write unit test for the key-delete confirmation prompt": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010483924
+      }
+    ],
+    "13.3 Write property test for bounded concurrency": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010486275
+      }
+    ],
+    "13.4 Write property test for exactly-one active tab": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010487178
+      }
+    ],
+    "13.5 Write property test for resource release on tab close": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010488632
+      }
+    ],
+    "13.6 Write unit test for active-tab close confirmation": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010489584
+      }
+    ],
+    "3.3 Write property test for profile validation rejection": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010491930
+      }
+    ],
+    "3.4 Write property test for save-failure state preservation": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010492834
+      }
+    ],
+    "3.6 Write property test for confirmed profile deletion": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010494283
+      }
+    ],
+    "3.7 Write unit test for the profile-delete confirmation prompt": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010495179
+      }
+    ],
+    "3.9 Write property test for folder name validity": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010496635
+      }
+    ],
+    "3.11 Write property test for single-folder association after move": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010497579
+      }
+    ],
+    "3.12 Write property test for hierarchy depth and acyclicity": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010498476
+      }
+    ],
+    "3.14 Write property test for confirmed subtree deletion": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010499926
+      }
+    ],
+    "3.15 Write property test for cancelled deletion no-op": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010500831
+      }
+    ],
+    "3.16 Write unit test for non-empty folder delete confirmation": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010501885
+      }
+    ],
+    "15.2 Write property test for transfer progress correctness": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010509017
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014454795
+      }
+    ],
+    "16.2 Write property test for post-enable-only capture": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010510458
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014459490
+      }
+    ],
+    "17.2 Write property test for in-order command sending": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010511437
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014465175
+      }
+    ],
+    "18.2 Write property test for export containing no plaintext credentials": [
+      {
+        "executionId": "14ded944-d3dc-4b60-95ef-759db7612847",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792010512286
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014470783
+      }
+    ],
+    "15.3 Write property test for incomplete-transfer cleanup": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014456263
+      }
+    ],
+    "15.4 Write property test for failed-navigation listing preservation": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014457141
+      }
+    ],
+    "15.5 Write unit test for overwrite confirmation": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014458583
+      }
+    ],
+    "16.3 Write property test for disable-preserves-entries": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014460984
+      }
+    ],
+    "16.4 Write property test for ISO-8601 timestamp prefix": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014461878
+      }
+    ],
+    "16.5 Write property test for write-failure entry preservation": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014463286
+      }
+    ],
+    "16.6 Write property test for invalid-destination handling": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014464228
+      }
+    ],
+    "17.3 Write property test for wait-for-prompt gating": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014466578
+      }
+    ],
+    "17.4 Write property test for script timeout behavior": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014467481
+      }
+    ],
+    "17.5 Write property test for disconnection-stops-execution": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014468928
+      }
+    ],
+    "17.6 Write property test for completion reporting": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014469892
+      }
+    ],
+    "18.3 Write property test for export/import round-trip and additivity": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014472233
+      }
+    ],
+    "18.4 Write property test for malformed-import rejection": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014473135
+      }
+    ],
+    "18.5 Write property test for colliding-id import as new entries": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014474611
+      }
+    ],
+    "18.6 Write property test for accurate added counts": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014475363
+      }
+    ],
+    "8.2 Write property test for SSH port/timeout resolution": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014552346
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014909598
+      }
+    ],
+    "10.2 Write property test for serial parameter validity": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014553243
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014911947
+      }
+    ],
+    "11.2 Write property test for RDP resolution bounds": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014554253
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014912572
+      }
+    ],
+    "9.2 Write property test for Telnet timeout resolution": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014555304
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014910545
+      }
+    ],
+    "8.3 Write property test for missing-credentials abort": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014917104
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014932265
+      }
+    ],
+    "8.4 Write property test for bounded auth attempts": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014918107
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014930516
+      }
+    ],
+    "8.5 Write property test for declined host-key abort": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014919050
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014929019
+      }
+    ],
+    "8.6 Write unit tests for SSH auth wiring and host-key prompt": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014920481
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014933714
+      }
+    ],
+    "10.3 Write unit test for the no-ports-available state": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014921817
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014931425
+      }
+    ],
+    "11.3 Write unit test for RDP auth wiring": [
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014922567
+      },
+      {
+        "executionId": "5253f536-b179-4f26-8205-ebd3194db2e6",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792014934432
+      }
+    ],
+    "25.1 Wire the real russh SSH transport": [
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792015201475
+      },
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792015940776
+      }
+    ],
+    "25.2 Wire the real ironrdp RDP transport": [
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792015202448
+      },
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792020303033
+      }
+    ],
+    "25.3 Wire the real russh-sftp file-transfer backend": [
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792015203511
+      },
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792015941528
+      }
+    ],
+    "25.4 Assemble transports into the IPC layer": [
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792020328007
+      },
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792020995803
+      }
+    ],
+    "25. Wire live transport backends (SSH, RDP, SFTP) and assemble into IPC": [
+      {
+        "executionId": "08a79e17-8ccb-4fc3-bcdc-efb0c2ef492f",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792020995841
+      }
+    ],
+    "26.1 Add login identity (SSH username, RDP username/domain) to the data model": [
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792022000586
+      },
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792024679892
+      }
+    ],
+    "26.2 Persist SSH private-key material and expose it to the key resolver": [
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792022001530
+      },
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792024681312
+      }
+    ],
+    "26.4 Complete RDP NLA network client and mid-session resize": [
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792022002578
+      },
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792024682263
+      }
+    ],
+    "26.3 Enforce host-key / certificate trust with a prompt channel and known-hosts store": [
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792024688234
+      },
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792025818049
+      }
+    ],
+    "26.5 Make transfers cancellable and wire the live script runner": [
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792025818984
+      },
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792026598989
+      }
+    ],
+    "26. Close transport-wiring gaps (key auth, login identity, host trust, RDP NLA/resize, transfer cancel & scripts)": [
+      {
+        "executionId": "f68fa26d-aedc-4dbd-ab70-b3a2899dfaf3",
+        "chatSessionId": "sess_a7b2c27d-32c3-4473-b104-d501daa21292",
+        "timestamp": 1792026599041
+      }
+    ]
+  }
+}

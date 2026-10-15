@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS entitlements for Novrix Console.
+
+  These entitlements are embedded into the Developer ID code signature by Tauri
+  during the macOS build (referenced from tauri.conf.json -> bundle.macOS.entitlements).
+  They are REQUIRED under the Hardened Runtime, which notarization enforces: without
+  declaring a capability here, the corresponding runtime API is blocked once the app
+  is signed with the Hardened Runtime.
+
+  Each key below maps to a concrete capability of the application:
+
+  - com.apple.security.network.client
+      Outbound network access. Needed by every remote protocol the app speaks:
+      SSH, Telnet and RDP all open outbound TCP connections to remote hosts.
+      (Requirements 1.1/1.2 - the app must function as a network client on macOS.)
+
+  - com.apple.security.device.serial
+      Access to serial devices (e.g. /dev/tty.* / /dev/cu.*). Needed by the Serial
+      protocol engine (serialport crate) to open physical/virtual serial ports.
+
+  - com.apple.security.device.usb
+      Access to USB devices. Serial adapters are commonly USB-to-serial bridges
+      (FTDI, CP210x, CH340, etc.), so USB access is required alongside the serial
+      entitlement for the Serial protocol to reach those devices.
+
+  Keychain note (Requirement 1.3):
+      The Credential_Store uses the macOS Keychain via the `keyring` crate
+      (apple-native backend). Access to the app's OWN keychain items does NOT
+      require a dedicated entitlement key; it is governed by the application's
+      keychain-access-group identity, which is derived from the app's code
+      signature (Developer ID + Team ID). Signing the app (which this file is part
+      of) is what grants that stable identity. We deliberately do NOT request the
+      broad `keychain-access-groups` entitlement because the app only reads/writes
+      its own credentials; adding a shared access group would be an unnecessary
+      privilege expansion. If credential sharing with another signed app is ever
+      required, add a `keychain-access-groups` <array> here with the shared group.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Outbound network client: SSH / Telnet / RDP connections. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Serial port access for the Serial protocol engine. -->
+    <key>com.apple.security.device.serial</key>
+    <true/>
+
+    <!-- USB access for USB-to-serial adapters used by the Serial protocol. -->
+    <key>com.apple.security.device.usb</key>
+    <true/>
+</dict>
+</plist>
