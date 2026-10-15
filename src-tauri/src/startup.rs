@@ -237,8 +237,8 @@ mod tests {
                 9 => 0u32..=20,
                 1 => 0u32..=u32::MAX,
             ];
-            let some = (host_os(), major)
-                .prop_map(|(os, major)| Some(HostOsVersion::new(os, major)));
+            let some =
+                (host_os(), major).prop_map(|(os, major)| Some(HostOsVersion::new(os, major)));
             prop_oneof![
                 9 => some,
                 1 => Just(None),

@@ -12,9 +12,9 @@
 use proptest::prelude::*;
 
 use super::color::{AnsiColor, CellStyle, Color};
+use super::emulator::{Dimensions, TerminalEmulator};
 use super::grid::{Cell, Cursor};
 use super::scrollback::{ScrollbackBuffer, DEFAULT_SCROLLBACK_LINES};
-use super::emulator::{Dimensions, TerminalEmulator};
 
 // Run a healthy number of cases per property (requirement: >= 100 iterations).
 const CASES: u32 = 256;

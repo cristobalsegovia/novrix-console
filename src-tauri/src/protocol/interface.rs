@@ -18,8 +18,7 @@ use crate::domain::{ConnectionProfile, CredentialKey, ProtocolError, ProtocolKin
 /// names the missing operations (Requirement 8.4). Keeping the list in one
 /// place lets the registry and the completeness check agree on the exact
 /// spelling the error message uses.
-pub const UNIFORM_OPERATIONS: &[&str] =
-    &["establish", "send", "recv", "resize", "close", "state"];
+pub const UNIFORM_OPERATIONS: &[&str] = &["establish", "send", "recv", "resize", "close", "state"];
 
 /// A connection profile whose credential references have been resolved to the
 /// concrete handles the protocol needs to connect.

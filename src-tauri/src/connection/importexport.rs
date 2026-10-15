@@ -73,9 +73,7 @@
 
 use std::collections::HashMap;
 
-use crate::domain::{
-    ConnectionProfile, ExportFile, Folder, FolderId, ImportError, ProfileId,
-};
+use crate::domain::{ConnectionProfile, ExportFile, Folder, FolderId, ImportError, ProfileId};
 
 /// The export-file format version this build writes and accepts on import.
 ///
@@ -152,8 +150,8 @@ pub fn serialize_export(export: &ExportFile) -> Result<Vec<u8>, ImportError> {
 /// On `Ok` the file is structurally valid and version-compatible; the caller
 /// may then [`remap_import`] it and insert the result.
 pub fn parse_export(bytes: &[u8]) -> Result<ExportFile, ImportError> {
-    let export: ExportFile = serde_json::from_slice(bytes)
-        .map_err(|e| ImportError::Malformed(e.to_string()))?;
+    let export: ExportFile =
+        serde_json::from_slice(bytes).map_err(|e| ImportError::Malformed(e.to_string()))?;
 
     if export.schema_version != EXPORT_SCHEMA_VERSION {
         return Err(ImportError::UnsupportedVersion(export.schema_version));
@@ -242,9 +240,7 @@ pub fn import_counts(folders: &[Folder], profiles: &[ConnectionProfile]) -> Impo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
-        AuthConfig, CredentialKey, HostKeyPolicy, ProtocolKind, ProtocolParams,
-    };
+    use crate::domain::{AuthConfig, CredentialKey, HostKeyPolicy, ProtocolKind, ProtocolParams};
 
     fn folder(name: &str, parent: Option<FolderId>, depth: u8) -> Folder {
         Folder {
@@ -331,7 +327,9 @@ mod tests {
         };
         let bytes = serde_json::to_vec(&export).unwrap();
         let err = parse_export(&bytes).unwrap_err();
-        assert!(matches!(err, ImportError::UnsupportedVersion(v) if v == EXPORT_SCHEMA_VERSION + 1));
+        assert!(
+            matches!(err, ImportError::UnsupportedVersion(v) if v == EXPORT_SCHEMA_VERSION + 1)
+        );
     }
 
     #[test]
@@ -446,7 +444,9 @@ mod property_tests {
             "[a-zA-Z0-9/_-]{1,24}".prop_map(|k| AuthConfig::Password {
                 credential_key: CredentialKey::new(k),
             }),
-            Just(()).prop_map(|_| AuthConfig::SshKey { key_id: KeyId::new() }),
+            Just(()).prop_map(|_| AuthConfig::SshKey {
+                key_id: KeyId::new()
+            }),
         ]
     }
 
@@ -503,7 +503,16 @@ mod property_tests {
             proptest::option::of(0usize..32),
         )
             .prop_map(
-                |(name, host, port, auth, (protocol, params), logging_enabled, timeout, folder_slot)| {
+                |(
+                    name,
+                    host,
+                    port,
+                    auth,
+                    (protocol, params),
+                    logging_enabled,
+                    timeout,
+                    folder_slot,
+                )| {
                     ProfileSpec {
                         name,
                         host,
@@ -531,15 +540,17 @@ mod property_tests {
     }
 
     fn any_folder_spec() -> impl Strategy<Value = FolderSpec> {
-        ("[a-zA-Z0-9 _-]{1,16}", proptest::option::of(0usize..32)).prop_map(
-            |(name, parent_slot)| FolderSpec { name, parent_slot },
-        )
+        ("[a-zA-Z0-9 _-]{1,16}", proptest::option::of(0usize..32))
+            .prop_map(|(name, parent_slot)| FolderSpec { name, parent_slot })
     }
 
     /// Assemble an internally-consistent [`ExportFile`] from folder/profile
     /// specs: a forest with correct depths and every reference pointing at a
     /// folder present in the file.
-    fn assemble_export(folder_specs: Vec<FolderSpec>, profile_specs: Vec<ProfileSpec>) -> ExportFile {
+    fn assemble_export(
+        folder_specs: Vec<FolderSpec>,
+        profile_specs: Vec<ProfileSpec>,
+    ) -> ExportFile {
         let mut folders: Vec<Folder> = Vec::with_capacity(folder_specs.len());
         for (position, spec) in folder_specs.iter().enumerate() {
             // A parent may only be an *earlier* folder, which keeps the forest
@@ -589,10 +600,7 @@ mod property_tests {
 
     /// A strategy for an internally-consistent export file (forest + profiles).
     fn consistent_export() -> impl Strategy<Value = ExportFile> {
-        (
-            vec(any_folder_spec(), 0..8),
-            vec(any_profile_spec(), 0..8),
-        )
+        (vec(any_folder_spec(), 0..8), vec(any_profile_spec(), 0..8))
             .prop_map(|(folder_specs, profile_specs)| assemble_export(folder_specs, profile_specs))
     }
 
@@ -622,7 +630,15 @@ mod property_tests {
     fn profile_shape(
         folders: &[Folder],
         profiles: &[ConnectionProfile],
-    ) -> Vec<(String, ProtocolKind, String, u16, Option<String>, AuthConfig, bool)> {
+    ) -> Vec<(
+        String,
+        ProtocolKind,
+        String,
+        u16,
+        Option<String>,
+        AuthConfig,
+        bool,
+    )> {
         let name_by_id: std::collections::HashMap<FolderId, String> =
             folders.iter().map(|f| (f.id, f.name.clone())).collect();
         let mut shapes: Vec<_> = profiles

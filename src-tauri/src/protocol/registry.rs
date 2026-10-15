@@ -52,7 +52,11 @@ impl ProtocolRegistry {
         }
 
         let kind = p.kind();
-        match self.protocols.iter_mut().find(|existing| existing.kind() == kind) {
+        match self
+            .protocols
+            .iter_mut()
+            .find(|existing| existing.kind() == kind)
+        {
             Some(slot) => *slot = p,
             None => self.protocols.push(p),
         }

@@ -93,18 +93,18 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex};
 
-use crate::connection::{ConnectionManager, DeletionSummary, ExportSummary, ImportSummary, ProfileDraft};
-use crate::credential::{
-    CredentialStore, KeyringCredentialStore, KeyringSecureStore, SecureStore,
+use crate::connection::{
+    ConnectionManager, DeletionSummary, ExportSummary, ImportSummary, ProfileDraft,
 };
+use crate::credential::{CredentialStore, KeyringCredentialStore, KeyringSecureStore, SecureStore};
 use crate::domain::{
     AuthConfig, ConnectionProfile, CredentialError, CredentialKey, DomainError, Folder, FolderId,
     HostKeyPolicy, KeyError, KeyId, KeyType, ManagedKey, ProfileId, ProtocolError, ProtocolKind,
     ProtocolParams, SessionId, SessionState, TransferError,
 };
-use crate::persistence::{decide_trust, KnownHostsStore, TrustDecision, TrustKind};
 use crate::keys::{resolve_private_key_openssh, DefaultKeyManager, KeyManager, SecretStore};
 use crate::logging::{FileSinkFactory, SessionLogger, SystemClock};
+use crate::persistence::{decide_trust, KnownHostsStore, TrustDecision, TrustKind};
 use crate::protocol::{
     available_port_names, CredentialHandle, HostKeyVerifier, IronRdpConnector, Protocol,
     ProtocolRegistry, RdpCertVerifier, RdpCredentialSource, RdpProtocol, ResolvedCredential,
@@ -384,10 +384,7 @@ struct SftpSessionsProvider {
 
 #[async_trait]
 impl SftpSessionProvider for SftpSessionsProvider {
-    async fn sftp_session(
-        &self,
-        session: SessionId,
-    ) -> Result<SharedSftpSession, TransferError> {
+    async fn sftp_session(&self, session: SessionId) -> Result<SharedSftpSession, TransferError> {
         self.sessions
             .lock()
             .await
@@ -497,9 +494,7 @@ impl ConnectionHandle {
     /// and downcast back here, so the call site stays fully typed.
     async fn run<T, F>(&self, job: F) -> Result<T, DomainError>
     where
-        F: FnOnce(&ConnectionManager<OsCredentialStore>) -> Result<T, DomainError>
-            + Send
-            + 'static,
+        F: FnOnce(&ConnectionManager<OsCredentialStore>) -> Result<T, DomainError> + Send + 'static,
         T: Send + 'static,
     {
         self.dispatch(move |mgr| {
@@ -614,7 +609,10 @@ impl<S: SecureStore> SecretStore for KeyringSecretStoreAdapter<S> {
         secret: &str,
     ) -> Result<(), KeyError> {
         self.backend
-            .set(key.as_str(), &crate::credential::Secret::new(secret.to_string()))
+            .set(
+                key.as_str(),
+                &crate::credential::Secret::new(secret.to_string()),
+            )
             .await
             .map_err(|e| KeyError::StorageFailed(e.to_string()))
     }
@@ -701,10 +699,7 @@ struct IpcSecretResolver {
 
 #[async_trait]
 impl SecretResolver for IpcSecretResolver {
-    async fn resolve_secret(
-        &self,
-        key: &CredentialKey,
-    ) -> Result<Option<String>, ProtocolError> {
+    async fn resolve_secret(&self, key: &CredentialKey) -> Result<Option<String>, ProtocolError> {
         match self.store.get(key.clone()).await {
             Ok(secret) => Ok(Some(secret.expose().to_string())),
             Err(CredentialError::NotFound) => Ok(None),
@@ -740,9 +735,7 @@ impl SshKeyResolver for IpcSshKeyResolver {
     async fn resolve_key(&self, key_id: KeyId) -> Result<Option<String>, ProtocolError> {
         resolve_private_key_openssh(self.store.as_ref(), key_id)
             .await
-            .map_err(|e| {
-                ProtocolError::Io(format!("key store failure resolving SSH key: {e}"))
-            })
+            .map_err(|e| ProtocolError::Io(format!("key store failure resolving SSH key: {e}")))
     }
 }
 
@@ -832,12 +825,9 @@ impl IpcHostKeyVerifier {
                 let accepted = if self.policy == HostKeyPolicy::AcceptAny {
                     true
                 } else {
-                    let rx = self.prompts.begin(
-                        &self.host,
-                        self.port,
-                        self.kind.as_str(),
-                        fingerprint,
-                    );
+                    let rx =
+                        self.prompts
+                            .begin(&self.host, self.port, self.kind.as_str(), fingerprint);
                     // A dropped sender (UI gone / no handle) resolves to Err →
                     // reject, the fail-safe default.
                     rx.await.unwrap_or(false)
@@ -847,12 +837,9 @@ impl IpcHostKeyVerifier {
                     // Persist the acceptance so the next connect proceeds
                     // silently and a future change is caught. A write failure
                     // does not undo the user's accept for *this* connect.
-                    let _ = self.store.remember(
-                        &self.host,
-                        self.port,
-                        self.kind,
-                        fingerprint,
-                    );
+                    let _ = self
+                        .store
+                        .remember(&self.host, self.port, self.kind, fingerprint);
                 }
                 accepted
             }
@@ -938,10 +925,7 @@ impl RdpCredentialSource for IpcRdpCredentialSource {
 /// the right policy. For the registry placeholder (which never establishes),
 /// pass `host_key = None`; an always-reject verifier is used so a placeholder
 /// could never silently trust anything if it were ever driven.
-fn build_ssh_protocol(
-    username: Option<&str>,
-    host_key: Option<SshHostKeyContext>,
-) -> SshProtocol {
+fn build_ssh_protocol(username: Option<&str>, host_key: Option<SshHostKeyContext>) -> SshProtocol {
     let login = username
         .map(str::trim)
         .filter(|u| !u.is_empty())
@@ -1168,10 +1152,7 @@ pub async fn delete_profile(
 pub async fn list_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<ConnectionProfile>, DomainError> {
-    state
-        .connection
-        .run(|m| m.database().list_profiles())
-        .await
+    state.connection.run(|m| m.database().list_profiles()).await
 }
 
 // ---------------------------------------------------------------------------
@@ -1224,10 +1205,7 @@ pub async fn move_folder(
     id: FolderId,
     dest: Option<FolderId>,
 ) -> Result<(), DomainError> {
-    state
-        .connection
-        .run(move |m| m.move_folder(id, dest))
-        .await
+    state.connection.run(move |m| m.move_folder(id, dest)).await
 }
 
 /// Delete a folder and its subtree after confirmation (Req 3.6, 3.7, 3.8).
@@ -1418,10 +1396,7 @@ pub async fn open_session(
 
 /// Activate a tab so exactly one tab is active (Requirement 9.5).
 #[tauri::command]
-pub async fn activate_tab(
-    state: State<'_, AppState>,
-    id: SessionId,
-) -> Result<(), DomainError> {
+pub async fn activate_tab(state: State<'_, AppState>, id: SessionId) -> Result<(), DomainError> {
     state.sessions.activate_tab(id).await
 }
 
@@ -1516,10 +1491,7 @@ pub async fn import_key(
 
 /// Return a managed key's OpenSSH public key for copying (Requirement 12.9).
 #[tauri::command]
-pub async fn key_public_key(
-    state: State<'_, AppState>,
-    id: KeyId,
-) -> Result<String, DomainError> {
+pub async fn key_public_key(state: State<'_, AppState>, id: KeyId) -> Result<String, DomainError> {
     state.keys.public_key(id).map_err(DomainError::from)
 }
 
@@ -1530,7 +1502,11 @@ pub async fn delete_key(
     id: KeyId,
     confirmed: bool,
 ) -> Result<(), DomainError> {
-    state.keys.delete(id, confirmed).await.map_err(DomainError::from)
+    state
+        .keys
+        .delete(id, confirmed)
+        .await
+        .map_err(DomainError::from)
 }
 
 // ---------------------------------------------------------------------------
@@ -1685,10 +1661,7 @@ pub async fn start_logging(
 
 /// Stop recording a session's I/O, retaining written entries (Requirement 14.3).
 #[tauri::command]
-pub async fn stop_logging(
-    state: State<'_, AppState>,
-    id: SessionId,
-) -> Result<(), DomainError> {
+pub async fn stop_logging(state: State<'_, AppState>, id: SessionId) -> Result<(), DomainError> {
     state.logger.stop(id).map_err(DomainError::from)
 }
 
@@ -1749,10 +1722,20 @@ impl From<ScriptStepDto> for ScriptStep {
 
 /// Serializable script outcome mirroring [`crate::script::ScriptOutcome`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all_fields = "camelCase", rename_all = "camelCase", tag = "status")]
+#[serde(
+    rename_all_fields = "camelCase",
+    rename_all = "camelCase",
+    tag = "status"
+)]
 pub enum ScriptOutcomeDto {
-    Success { sent: usize },
-    Failure { command_index: usize, code: String, message: String },
+    Success {
+        sent: usize,
+    },
+    Failure {
+        command_index: usize,
+        code: String,
+        message: String,
+    },
 }
 
 impl From<ScriptOutcome> for ScriptOutcomeDto {
@@ -1788,10 +1771,7 @@ pub async fn export_config(
     state: State<'_, AppState>,
     path: PathBuf,
 ) -> Result<ExportSummaryDto, DomainError> {
-    let summary: ExportSummary = state
-        .connection
-        .run(move |m| m.export_config(path))
-        .await?;
+    let summary: ExportSummary = state.connection.run(move |m| m.export_config(path)).await?;
     Ok(ExportSummaryDto {
         folders_exported: summary.folders_exported,
         profiles_exported: summary.profiles_exported,
@@ -2139,10 +2119,7 @@ mod tests {
 
     /// Build an `IpcHostKeyVerifier` over an in-memory trust store and an
     /// (unattached) prompt channel for the wiring tests below.
-    fn verifier_over(
-        store: Arc<KnownHostsStore>,
-        policy: HostKeyPolicy,
-    ) -> IpcHostKeyVerifier {
+    fn verifier_over(store: Arc<KnownHostsStore>, policy: HostKeyPolicy) -> IpcHostKeyVerifier {
         IpcHostKeyVerifier::new(
             store,
             HostKeyPrompts::new(TauriEventEmitter::new()),
@@ -2223,9 +2200,8 @@ mod tests {
         // verifier emits it. The event emitter is unattached, so no event is
         // delivered; we fulfil the pending oneshot directly by draining the map.
         let prompts_for_task = prompts.clone();
-        let decide = tokio::spawn(async move {
-            verifier.confirm_unknown_host_key("SHA256:k1").await
-        });
+        let decide =
+            tokio::spawn(async move { verifier.confirm_unknown_host_key("SHA256:k1").await });
 
         // Give the verifier a moment to register the pending prompt, then accept
         // whatever request id is in flight.
@@ -2254,9 +2230,8 @@ mod tests {
         );
 
         let prompts_for_task = prompts.clone();
-        let decide = tokio::spawn(async move {
-            verifier.confirm_unknown_host_key("SHA256:k1").await
-        });
+        let decide =
+            tokio::spawn(async move { verifier.confirm_unknown_host_key("SHA256:k1").await });
         tokio::task::yield_now().await;
         accept_only_pending(&prompts_for_task, false);
 
@@ -2312,10 +2287,7 @@ mod tests {
                     .insert(key.as_str().to_string(), secret.to_string());
                 Ok(())
             }
-            async fn get_secret(
-                &self,
-                key: &CredentialKey,
-            ) -> Result<Option<String>, KeyError> {
+            async fn get_secret(&self, key: &CredentialKey) -> Result<Option<String>, KeyError> {
                 if self.fail_get {
                     return Err(KeyError::StorageFailed("boom".to_string()));
                 }

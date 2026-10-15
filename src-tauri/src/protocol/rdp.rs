@@ -109,9 +109,7 @@ pub fn resolution_in_bounds(resolution: Resolution) -> bool {
 /// - `Some(r)` out of bounds → `Err(ProtocolError::InvalidParameter { parameter: "resolution", .. })`
 ///   (reject, identify the invalid resolution, do not connect — Requirement 7.9).
 /// - `None` → `Ok(DEFAULT_RESOLUTION)` (documented in-range fallback).
-pub fn validate_resolution(
-    requested: Option<Resolution>,
-) -> Result<Resolution, ProtocolError> {
+pub fn validate_resolution(requested: Option<Resolution>) -> Result<Resolution, ProtocolError> {
     match requested {
         None => Ok(DEFAULT_RESOLUTION),
         Some(r) if resolution_in_bounds(r) => Ok(r),
@@ -213,10 +211,8 @@ impl std::fmt::Debug for ResolvedCredential {
 #[async_trait]
 pub trait RdpCredentialSource: Send + Sync {
     /// Resolve the secret for `handle`, or report it missing.
-    async fn resolve(
-        &self,
-        handle: &CredentialHandle,
-    ) -> Result<ResolvedCredential, ProtocolError>;
+    async fn resolve(&self, handle: &CredentialHandle)
+        -> Result<ResolvedCredential, ProtocolError>;
 }
 
 /// A live RDP transport returned by a successful [`RdpConnector::connect`].
@@ -346,9 +342,7 @@ where
         let host = cfg.profile.host.clone();
         let port = cfg.profile.port;
 
-        let connect = self
-            .connector
-            .connect(&host, port, resolution, credential);
+        let connect = self.connector.connect(&host, port, resolution, credential);
 
         let transport = match tokio::time::timeout(budget, connect).await {
             Err(_elapsed) => return Err(ProtocolError::Timeout),
@@ -947,9 +941,10 @@ impl SessionWorker {
             .encode_resize(resolution.width, resolution.height, None, None)
         {
             Some(Ok(frame)) => {
-                self.writer.write_all(&frame).await.map_err(|e| {
-                    ProtocolError::Io(format!("RDP resize write failed: {e}"))
-                })?;
+                self.writer
+                    .write_all(&frame)
+                    .await
+                    .map_err(|e| ProtocolError::Io(format!("RDP resize write failed: {e}")))?;
                 // The server honours the Monitor Layout change in place; adopt
                 // the new resolution and resize the local framebuffer so decoded
                 // frames land in a correctly sized image.
@@ -961,9 +956,7 @@ impl SessionWorker {
                 );
                 Ok(())
             }
-            Some(Err(e)) => {
-                Err(ProtocolError::Io(format!("encode RDP resize failed: {e}")))
-            }
+            Some(Err(e)) => Err(ProtocolError::Io(format!("encode RDP resize failed: {e}"))),
             None => Err(ProtocolError::InvalidParameter {
                 parameter: "resolution".to_string(),
                 message: "mid-session resize unavailable: the server did not \
@@ -1090,8 +1083,7 @@ async fn connect_sequence(
     // The upgrade's rustls verifier consults `cert_verifier` with the server
     // leaf certificate's fingerprint (task 26.3); a declined/changed cert aborts
     // the handshake here, before CredSSP, so no session is produced.
-    let (tls_stream, server_public_key) =
-        tls_upgrade(initial_stream, host, cert_verifier).await?;
+    let (tls_stream, server_public_key) = tls_upgrade(initial_stream, host, cert_verifier).await?;
 
     let upgraded = ironrdp_tokio::mark_as_upgraded(should_upgrade, &mut connector);
 
@@ -1251,7 +1243,9 @@ impl SspiNetworkClient {
             .ok_or_else(|| ConnectorError::general("KDC-proxy URL has no host"))?
             .to_owned();
         let https = url.scheme().eq_ignore_ascii_case("https");
-        let port = url.port_or_known_default().unwrap_or(if https { 443 } else { 80 });
+        let port = url
+            .port_or_known_default()
+            .unwrap_or(if https { 443 } else { 80 });
         let path = {
             let p = url.path();
             if let Some(q) = url.query() {
@@ -1387,9 +1381,7 @@ fn parse_http_response_body(raw: &[u8]) -> ConnectorResult<Vec<u8>> {
         };
         let name = name.trim();
         let value = value.trim();
-        if name.eq_ignore_ascii_case("transfer-encoding")
-            && value.eq_ignore_ascii_case("chunked")
-        {
+        if name.eq_ignore_ascii_case("transfer-encoding") && value.eq_ignore_ascii_case("chunked") {
             chunked = true;
         } else if name.eq_ignore_ascii_case("content-length") {
             content_length = value.parse::<usize>().ok();
@@ -1442,10 +1434,7 @@ fn decode_chunked_body(mut data: &[u8]) -> ConnectorResult<Vec<u8>> {
 
 /// Open a TLS stream to `host` over an existing TCP stream using the same
 /// accept-any verifier as the RDP channel. Shared by the KDC-proxy HTTPS path.
-async fn tls_connect_any(
-    tcp: TcpStream,
-    host: &str,
-) -> ConnectorResult<TlsStream<TcpStream>> {
+async fn tls_connect_any(tcp: TcpStream, host: &str) -> ConnectorResult<TlsStream<TcpStream>> {
     let config = rustls::ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(danger::NoCertificateVerification))
@@ -1641,8 +1630,8 @@ fn decode_input_event(event: &[u8]) -> Result<Vec<Operation>, ProtocolError> {
         }),
         0x04 | 0x05 => {
             let idx = *payload.first().ok_or_else(|| bad("missing button byte"))?;
-            let button =
-                MouseButton::from_idx(usize::from(idx)).ok_or_else(|| bad("invalid mouse button"))?;
+            let button = MouseButton::from_idx(usize::from(idx))
+                .ok_or_else(|| bad("invalid mouse button"))?;
             if opcode == 0x04 {
                 Operation::MouseButtonPressed(button)
             } else {
@@ -1823,9 +1812,7 @@ mod danger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
-        AuthConfig, ConnectionProfile, CredentialKey, ProfileId, ProtocolParams,
-    };
+    use crate::domain::{AuthConfig, ConnectionProfile, CredentialKey, ProfileId, ProtocolParams};
     use proptest::prelude::*;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
@@ -2051,10 +2038,7 @@ mod tests {
         }
     }
 
-    fn rdp_profile(
-        resolution: Option<Resolution>,
-        timeout_secs: u16,
-    ) -> ResolvedProfile {
+    fn rdp_profile(resolution: Option<Resolution>, timeout_secs: u16) -> ResolvedProfile {
         ResolvedProfile::new(ConnectionProfile {
             id: ProfileId::new(),
             name: "desk".to_string(),
@@ -2199,14 +2183,12 @@ mod tests {
     #[test]
     fn connect_budget_is_clamped_to_thirty_seconds() {
         // Configured above the ceiling clamps down to 30s.
-        let budget = RdpProtocol::<IronRdpConnector, AlwaysPresent>::connect_budget(
-            &rdp_profile(None, 120),
-        );
+        let budget =
+            RdpProtocol::<IronRdpConnector, AlwaysPresent>::connect_budget(&rdp_profile(None, 120));
         assert_eq!(budget, MAX_CONNECT_TIMEOUT);
         // A zero configured timeout falls back to the ceiling.
-        let budget0 = RdpProtocol::<IronRdpConnector, AlwaysPresent>::connect_budget(
-            &rdp_profile(None, 0),
-        );
+        let budget0 =
+            RdpProtocol::<IronRdpConnector, AlwaysPresent>::connect_budget(&rdp_profile(None, 0));
         assert_eq!(budget0, MAX_CONNECT_TIMEOUT);
     }
 
@@ -2236,8 +2218,10 @@ mod tests {
             handle: &CredentialHandle,
         ) -> Result<ResolvedCredential, ProtocolError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            *self.last_key.lock().unwrap() =
-                handle.credential_key.as_ref().map(|k| k.as_str().to_string());
+            *self.last_key.lock().unwrap() = handle
+                .credential_key
+                .as_ref()
+                .map(|k| k.as_str().to_string());
             Ok(sample_credential())
         }
     }

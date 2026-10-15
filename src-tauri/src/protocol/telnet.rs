@@ -432,10 +432,10 @@ mod tests {
         prop_oneof![
             Just(0u16),
             Just(1u16),
-            Just(MAX_TIMEOUT_SECS),       // 120 — upper edge, still valid
-            Just(MAX_TIMEOUT_SECS + 1),   // 121 — just above the range
-            1u16..=MAX_TIMEOUT_SECS,      // in-range values
-            any::<u16>(),                 // the full domain, incl. large values
+            Just(MAX_TIMEOUT_SECS),     // 120 — upper edge, still valid
+            Just(MAX_TIMEOUT_SECS + 1), // 121 — just above the range
+            1u16..=MAX_TIMEOUT_SECS,    // in-range values
+            any::<u16>(),               // the full domain, incl. large values
         ]
     }
 
@@ -534,9 +534,7 @@ mod tests {
 
     #[tokio::test]
     async fn establish_rejects_port_zero_without_connecting() {
-        use crate::domain::{
-            AuthConfig, ConnectionProfile, ProfileId, ProtocolParams,
-        };
+        use crate::domain::{AuthConfig, ConnectionProfile, ProfileId, ProtocolParams};
 
         let profile = ConnectionProfile {
             id: ProfileId::new(),

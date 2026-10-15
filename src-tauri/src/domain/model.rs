@@ -371,7 +371,9 @@ mod tests {
             username: Some("deploy".to_string()),
             domain: None,
             folder_id: Some(FolderId::new()),
-            auth: AuthConfig::SshKey { key_id: KeyId::new() },
+            auth: AuthConfig::SshKey {
+                key_id: KeyId::new(),
+            },
             protocol_params: ProtocolParams::Ssh {
                 known_host_policy: HostKeyPolicy::PromptOnUnknown,
             },

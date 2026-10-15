@@ -104,9 +104,10 @@ impl Database {
 
     /// Enable pragmas and run migrations on a freshly opened connection.
     fn bootstrap(conn: Connection) -> Result<Self, DomainError> {
-        conn.pragma_update(None, "foreign_keys", true).map_err(|e| {
-            persistence_error("persistence.pragma", "Failed to enable foreign keys", e)
-        })?;
+        conn.pragma_update(None, "foreign_keys", true)
+            .map_err(|e| {
+                persistence_error("persistence.pragma", "Failed to enable foreign keys", e)
+            })?;
         let mut db = Self { conn };
         db.migrate()?;
         Ok(db)
@@ -301,11 +302,7 @@ fn migrate_to_v3(conn: &Connection) -> Result<(), DomainError> {
 
 /// Build a [`DomainError`] from a `rusqlite` error, attaching the underlying
 /// message as the `cause` (kept separate from the user-facing message).
-fn persistence_error(
-    code: &str,
-    message: &str,
-    cause: impl std::fmt::Display,
-) -> DomainError {
+fn persistence_error(code: &str, message: &str, cause: impl std::fmt::Display) -> DomainError {
     DomainError::new(code, message).with_cause(cause.to_string())
 }
 

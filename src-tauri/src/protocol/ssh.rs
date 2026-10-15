@@ -62,9 +62,7 @@ use russh::keys::{decode_secret_key, HashAlg, PrivateKey, PrivateKeyWithHashAlg}
 use russh::{Channel, ChannelMsg};
 use tokio::sync::Mutex;
 
-use crate::domain::{
-    AuthConfig, CredentialKey, KeyId, ProtocolError, ProtocolKind, SessionState,
-};
+use crate::domain::{AuthConfig, CredentialKey, KeyId, ProtocolError, ProtocolKind, SessionState};
 
 use super::interface::{CredentialHandle, Protocol, ResolvedProfile, SessionConn};
 
@@ -303,10 +301,7 @@ impl Default for AuthAttemptBudget {
 #[async_trait]
 pub trait SecretResolver: Send + Sync {
     /// Resolve the secret for `key`, or `Ok(None)` when none is stored.
-    async fn resolve_secret(
-        &self,
-        key: &CredentialKey,
-    ) -> Result<Option<String>, ProtocolError>;
+    async fn resolve_secret(&self, key: &CredentialKey) -> Result<Option<String>, ProtocolError>;
 }
 
 /// Resolves a referenced [`KeyId`] to its OpenSSH private-key material.
@@ -405,10 +400,7 @@ impl SshProtocol {
             AuthConfig::Password { credential_key } => {
                 // Prefer the key the caller resolved into the handle; fall back
                 // to the one named on the profile.
-                let key = creds
-                    .credential_key
-                    .as_ref()
-                    .unwrap_or(credential_key);
+                let key = creds.credential_key.as_ref().unwrap_or(credential_key);
                 match self.secrets.resolve_secret(key).await? {
                     Some(secret) => ResolvedAuthMaterial::Password(secret),
                     None => ResolvedAuthMaterial::MissingPassword,
@@ -584,8 +576,8 @@ async fn authenticate(
     let private_key: Option<Arc<PrivateKey>> = match plan {
         AuthPlan::Password(_) => None,
         AuthPlan::PublicKey { pem, .. } => {
-            let key = decode_secret_key(pem, None)
-                .map_err(|_| ProtocolError::MissingCredentials)?;
+            let key =
+                decode_secret_key(pem, None).map_err(|_| ProtocolError::MissingCredentials)?;
             Some(Arc::new(key))
         }
     };
@@ -658,9 +650,7 @@ fn map_io_error(io: std::io::Error) -> ProtocolError {
 /// to a [`ProtocolError`].
 fn map_transport_error(err: russh::Error) -> ProtocolError {
     match err {
-        russh::Error::ConnectionTimeout | russh::Error::KeepaliveTimeout => {
-            ProtocolError::Timeout
-        }
+        russh::Error::ConnectionTimeout | russh::Error::KeepaliveTimeout => ProtocolError::Timeout,
         russh::Error::IO(io) => ProtocolError::Io(io.to_string()),
         other => ProtocolError::Io(other.to_string()),
     }
@@ -997,9 +987,7 @@ mod tests {
 
     // --- Port composition + establish abort paths -------------------------
 
-    use crate::domain::{
-        ConnectionProfile, HostKeyPolicy, ProfileId, ProtocolParams,
-    };
+    use crate::domain::{ConnectionProfile, HostKeyPolicy, ProfileId, ProtocolParams};
     use std::sync::atomic::{AtomicBool, Ordering};
 
     /// A secret resolver returning a fixed outcome, recording whether it ran.
@@ -1209,7 +1197,10 @@ mod tests {
         let fingerprint = "SHA256:AbCdEf0123456789unknown-host-key";
         let accepted = verifier.confirm_unknown_host_key(fingerprint).await;
 
-        assert!(accepted, "an accepting verifier lets the connection proceed");
+        assert!(
+            accepted,
+            "an accepting verifier lets the connection proceed"
+        );
         let seen = verifier.seen.lock().unwrap();
         assert_eq!(
             seen.as_slice(),

@@ -44,8 +44,7 @@ use async_trait::async_trait;
 use serialport::{self, SerialPort};
 
 use crate::domain::{
-    BaudRate, DataBits, Parity, ProtocolError, ProtocolKind, ProtocolParams, SessionState,
-    StopBits,
+    BaudRate, DataBits, Parity, ProtocolError, ProtocolKind, ProtocolParams, SessionState, StopBits,
 };
 
 use super::interface::{CredentialHandle, Protocol, ResolvedProfile, SessionConn};
@@ -191,6 +190,11 @@ pub fn available_port_names() -> Result<Vec<String>, ProtocolError> {
 /// empty-list case. Extracting this one-liner gives the UI (and tests) a single
 /// named place that defines the contract — an empty [`available_port_names`]
 /// result is the no-ports state — without depending on the host's hardware.
+///
+/// Allowed-dead: consumed by the live serial integration test (spec task
+/// 10.4), which runs only in CI against a virtual port, so it has no
+/// in-crate caller yet.
+#[allow(dead_code)]
 pub fn no_ports_available(port_names: &[String]) -> bool {
     port_names.is_empty()
 }
@@ -352,8 +356,8 @@ mod tests {
 
     #[test]
     fn validate_rejects_an_unset_port_naming_the_parameter() {
-        let err = validate_serial_params(&serial_params(""))
-            .expect_err("an empty port name is rejected");
+        let err =
+            validate_serial_params(&serial_params("")).expect_err("an empty port name is rejected");
         match err {
             ProtocolError::InvalidParameter { parameter, .. } => {
                 assert_eq!(parameter, "port_name");
@@ -515,11 +519,11 @@ mod tests {
         /// (including ones padded with surrounding whitespace, which stay set).
         fn any_port_name() -> impl Strategy<Value = String> {
             prop_oneof![
-                Just(String::new()),                 // unset
-                "[ \t\r\n]{1,8}".prop_map(String::from), // whitespace-only -> unset
-                "[A-Za-z0-9/._-]{1,24}",             // a plain, set name
+                Just(String::new()),                         // unset
+                "[ \t\r\n]{1,8}".prop_map(String::from),     // whitespace-only -> unset
+                "[A-Za-z0-9/._-]{1,24}",                     // a plain, set name
                 "[ \t]{0,3}[A-Za-z0-9/._-]{1,16}[ \t]{0,3}", // set name w/ padding
-                any::<String>(),                     // the full domain
+                any::<String>(),                             // the full domain
             ]
         }
 

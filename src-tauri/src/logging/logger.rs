@@ -218,10 +218,7 @@ mod tests {
         }
     }
 
-    fn logger_with(
-        ts: i64,
-        sink: InMemorySink,
-    ) -> SessionLogger<FixedClock, InMemoryFactory> {
+    fn logger_with(ts: i64, sink: InMemorySink) -> SessionLogger<FixedClock, InMemoryFactory> {
         SessionLogger::new(FixedClock(ts), InMemoryFactory { sink })
     }
 
@@ -253,7 +250,9 @@ mod tests {
         assert!(shared.is_closed());
 
         // Post-disable I/O is dropped.
-        logger.record(session, Direction::Output, b"afterstop").unwrap();
+        logger
+            .record(session, Direction::Output, b"afterstop")
+            .unwrap();
 
         let lines: Vec<String> = shared
             .entries()

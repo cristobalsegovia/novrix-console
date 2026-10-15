@@ -20,10 +20,11 @@ use serde::{Deserialize, Serialize};
 /// reference model and the frontend can represent any color an SGR sequence
 /// selects. [`Color::Default`] means "use the terminal's default" and is what a
 /// freshly reset cell carries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Color {
     /// The terminal's default foreground/background color.
+    #[default]
     Default,
     /// One of the 16 basic ANSI colors.
     Ansi(AnsiColor),
@@ -31,12 +32,6 @@ pub enum Color {
     Indexed(u8),
     /// A 24-bit truecolor value.
     Rgb { r: u8, g: u8, b: u8 },
-}
-
-impl Default for Color {
-    fn default() -> Self {
-        Color::Default
-    }
 }
 
 /// The 16 basic ANSI colors: the 8 standard colors and their 8 bright variants.

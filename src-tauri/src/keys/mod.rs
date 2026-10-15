@@ -295,9 +295,7 @@ pub async fn resolve_private_key_openssh(
         .get_secret(&passphrase_slot(id))
         .await?
         .ok_or_else(|| {
-            KeyError::StorageFailed(
-                "encrypted managed key has no persisted passphrase".to_string(),
-            )
+            KeyError::StorageFailed("encrypted managed key has no persisted passphrase".to_string())
         })?;
 
     let decrypted = private_key
@@ -512,7 +510,10 @@ impl KeyManager for DefaultKeyManager {
             {
                 // Best-effort cleanup of the passphrase that did land; ignore a
                 // secondary failure so the original error is reported.
-                let _ = self.store.delete_secret(&Self::passphrase_key(managed.id)).await;
+                let _ = self
+                    .store
+                    .delete_secret(&Self::passphrase_key(managed.id))
+                    .await;
                 self.unregister(managed.id);
                 return Err(e);
             }
@@ -553,9 +554,10 @@ impl KeyManager for DefaultKeyManager {
         // The removal happens under the lock, which is released before the async
         // Secure_Storage call so the lock is never held across an `.await`.
         let had_passphrase = {
-            let mut keys = self.keys.lock().map_err(|_| {
-                KeyError::StorageFailed("key registry lock poisoned".to_string())
-            })?;
+            let mut keys = self
+                .keys
+                .lock()
+                .map_err(|_| KeyError::StorageFailed("key registry lock poisoned".to_string()))?;
             match keys.remove(&id) {
                 Some(stored) => stored.has_passphrase,
                 // Deleting a key that is not managed is reported as NotFound so
@@ -569,17 +571,13 @@ impl KeyManager for DefaultKeyManager {
         // `key/{id}/private` slot, so a confirmed deletion must remove it too.
         // `delete_secret` is idempotent, so this is safe even if the slot is
         // somehow already gone.
-        self.store
-            .delete_secret(&Self::private_key_key(id))
-            .await?;
+        self.store.delete_secret(&Self::private_key_key(id)).await?;
 
         // Requirement 12.7: if the key had a passphrase, remove it from
         // Secure_Storage. The port's `delete_secret` is idempotent, so a key
         // whose passphrase was already gone still deletes cleanly.
         if had_passphrase {
-            self.store
-                .delete_secret(&Self::passphrase_key(id))
-                .await?;
+            self.store.delete_secret(&Self::passphrase_key(id)).await?;
         }
 
         Ok(())
@@ -649,9 +647,10 @@ impl DefaultKeyManager {
         // id resolves to `Ok(None)` without touching Secure_Storage. The lock
         // is released before the async resolution below.
         {
-            let keys = self.keys.lock().map_err(|_| {
-                KeyError::StorageFailed("key registry lock poisoned".to_string())
-            })?;
+            let keys = self
+                .keys
+                .lock()
+                .map_err(|_| KeyError::StorageFailed("key registry lock poisoned".to_string()))?;
             if !keys.contains_key(&id) {
                 return Ok(None);
             }
@@ -677,8 +676,6 @@ impl DefaultKeyManager {
         self.keys.lock().map(|k| k.len()).unwrap_or(0)
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -1139,7 +1136,10 @@ mod tests {
         runtime().block_on(async {
             let manager = manager_for_generation();
             for size in [256u32, 384, 521] {
-                let managed = manager.generate(KeyType::Ecdsa, size).await.expect("generate ecdsa");
+                let managed = manager
+                    .generate(KeyType::Ecdsa, size)
+                    .await
+                    .expect("generate ecdsa");
                 let got = manager.public_key(managed.id).expect("public key");
                 // The exported public key equals the stored metadata and parses
                 // back into a public key of the matching ECDSA type.
@@ -1155,7 +1155,10 @@ mod tests {
         runtime().block_on(async {
             let manager = manager_for_generation();
             // One RSA case only — generation is slow.
-            let managed = manager.generate(KeyType::Rsa, 2048).await.expect("generate rsa");
+            let managed = manager
+                .generate(KeyType::Rsa, 2048)
+                .await
+                .expect("generate rsa");
             let got = manager.public_key(managed.id).expect("public key");
             assert_eq!(got, managed.public_key);
             let parsed = ssh_key::PublicKey::from_openssh(&got).expect("parse public key");
@@ -1230,7 +1233,10 @@ mod tests {
                 .expect("key is managed");
 
             let parsed = PrivateKey::from_openssh(pem.as_bytes()).expect("valid openssh key");
-            assert!(!parsed.is_encrypted(), "returned PEM must be usable without a passphrase");
+            assert!(
+                !parsed.is_encrypted(),
+                "returned PEM must be usable without a passphrase"
+            );
             let got_pub = parsed.public_key().to_openssh().expect("encode public");
             assert_eq!(got_pub, managed.public_key);
         });
@@ -1258,7 +1264,10 @@ mod tests {
             assert!(!observer.contains(&slot), "private slot must be deleted");
             assert_eq!(observer.len(), 0);
             assert_eq!(
-                manager.private_key_openssh(managed.id).await.expect("no backend error"),
+                manager
+                    .private_key_openssh(managed.id)
+                    .await
+                    .expect("no backend error"),
                 None
             );
         });

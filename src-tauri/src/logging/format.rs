@@ -109,10 +109,7 @@ mod tests {
 
     #[test]
     fn formats_the_unix_epoch() {
-        assert_eq!(
-            format_iso8601_utc(UnixTimestamp(0)),
-            "1970-01-01T00:00:00Z"
-        );
+        assert_eq!(format_iso8601_utc(UnixTimestamp(0)), "1970-01-01T00:00:00Z");
     }
 
     #[test]

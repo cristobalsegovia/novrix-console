@@ -372,9 +372,9 @@ pub fn validate_folder_move(
     dest: Option<FolderId>,
 ) -> Result<FolderMovePlan, DomainError> {
     // Rule 1: the moved folder must exist.
-    let moved = folders.get(&id).ok_or_else(|| {
-        DomainError::new("persistence.notFound", "No such folder.")
-    })?;
+    let moved = folders
+        .get(&id)
+        .ok_or_else(|| DomainError::new("persistence.notFound", "No such folder."))?;
 
     // Rule 1: a named destination must exist, and its depth anchors the move.
     let dest_depth = match dest {
@@ -402,8 +402,7 @@ pub fn validate_folder_move(
                 message: if dest_id == id {
                     "A folder cannot be moved into itself.".to_string()
                 } else {
-                    "A folder cannot be moved into one of its own descendants (cycle)."
-                        .to_string()
+                    "A folder cannot be moved into one of its own descendants (cycle).".to_string()
                 },
             }
             .into());
@@ -532,10 +531,7 @@ impl<C: CredentialStore> ConnectionManager<C> {
     /// transactionally, and the stored [`ConnectionProfile`] is returned. If
     /// the insert fails the transaction rolls back (nothing is stored) and a
     /// save-failure error is returned (Requirement 2.6).
-    pub fn create_profile(
-        &self,
-        draft: ProfileDraft,
-    ) -> Result<ConnectionProfile, DomainError> {
+    pub fn create_profile(&self, draft: ProfileDraft) -> Result<ConnectionProfile, DomainError> {
         validate_draft(&draft, SUPPORTED_PROTOCOLS)?;
         let profile = draft.into_profile(ProfileId::new());
         self.db
@@ -650,11 +646,7 @@ impl<C: CredentialStore> ConnectionManager<C> {
     /// If no profile with `id` exists, `persistence.notFound` is likewise
     /// returned. On a write failure the prior stored state is retained
     /// (Requirement 2.6, via the repository's transactional update).
-    pub fn move_profile(
-        &self,
-        id: ProfileId,
-        dest: Option<FolderId>,
-    ) -> Result<(), DomainError> {
+    pub fn move_profile(&self, id: ProfileId, dest: Option<FolderId>) -> Result<(), DomainError> {
         // Validate the destination exists before touching the profile, so a
         // dangling destination is reported without any write.
         if let Some(dest_id) = dest {
@@ -701,11 +693,7 @@ impl<C: CredentialStore> ConnectionManager<C> {
     /// specific violation — a cycle/descendant move or a max-depth breach —
     /// while a missing moved or destination folder surfaces
     /// `persistence.notFound`.
-    pub fn move_folder(
-        &self,
-        id: FolderId,
-        dest: Option<FolderId>,
-    ) -> Result<(), DomainError> {
+    pub fn move_folder(&self, id: FolderId, dest: Option<FolderId>) -> Result<(), DomainError> {
         // Snapshot the hierarchy keyed by id for the pure integrity check.
         let folders: std::collections::HashMap<FolderId, Folder> = self
             .db
@@ -817,11 +805,7 @@ impl<C: CredentialStore> ConnectionManager<C> {
     /// repository reports nothing was removed and the (also idempotent)
     /// credential cleanup still runs, so the end state — "no such profile, no
     /// such credential" — holds either way.
-    pub async fn delete_profile(
-        &self,
-        id: ProfileId,
-        confirmed: bool,
-    ) -> Result<(), DomainError> {
+    pub async fn delete_profile(&self, id: ProfileId, confirmed: bool) -> Result<(), DomainError> {
         // Requirement 2.7: without confirmation, remove nothing and signal that
         // confirmation is required. No repository or credential call happens.
         if !confirmed {
@@ -832,9 +816,7 @@ impl<C: CredentialStore> ConnectionManager<C> {
         }
 
         // Requirement 2.8: remove the profile from the repository.
-        self.db
-            .delete_profile(id)
-            .map_err(|e| delete_failure(e))?;
+        self.db.delete_profile(id).map_err(delete_failure)?;
 
         // Requirement 11.6 (wired here): remove the profile's credentials from
         // Secure_Storage. Idempotent, so an absent secret is not an error.
@@ -938,9 +920,7 @@ impl<C: CredentialStore> ConnectionManager<C> {
         // Requirement 3.7: delete the folder and its whole subtree atomically.
         // The schema's ON DELETE CASCADE removes nested folders and contained
         // profiles in one transaction, so nothing outside the subtree changes.
-        self.db
-            .delete_folder(id)
-            .map_err(delete_folder_failure)?;
+        self.db.delete_folder(id).map_err(delete_folder_failure)?;
 
         // Requirement 11.6: the cascade removed the contained profiles, so
         // their credentials must be cleaned from Secure_Storage too. Idempotent
@@ -973,7 +953,10 @@ impl<C: CredentialStore> ConnectionManager<C> {
     /// and profiles written. A read, serialization, or file-write failure
     /// surfaces a structured [`DomainError`]; nothing partial is reported as
     /// success.
-    pub fn export_config(&self, path: impl AsRef<std::path::Path>) -> Result<ExportSummary, DomainError> {
+    pub fn export_config(
+        &self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<ExportSummary, DomainError> {
         let folders = self.db.list_folders()?;
         let profiles = self.db.list_profiles()?;
 
@@ -1027,7 +1010,10 @@ impl<C: CredentialStore> ConnectionManager<C> {
     /// On success returns an [`ImportSummary`] with the accurate number of
     /// folders and profiles added (Requirement 16.5) — equal to the file's item
     /// counts, since import is strictly additive.
-    pub fn import_config(&self, path: impl AsRef<std::path::Path>) -> Result<ImportSummary, ImportError> {
+    pub fn import_config(
+        &self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<ImportSummary, ImportError> {
         // Step 1: read + validate. Any failure here is reported before touching
         // persistence, so the existing configuration is left unchanged.
         let bytes = std::fs::read(path.as_ref()).map_err(|e| ImportError::Io(e.to_string()))?;
@@ -1097,11 +1083,8 @@ fn delete_failure(err: DomainError) -> DomainError {
 /// error here is a genuine write failure and is surfaced as such with the
 /// original cause preserved for diagnostics.
 fn delete_folder_failure(err: DomainError) -> DomainError {
-    DomainError::new(
-        "connection.deleteFailed",
-        "Failed to delete the folder.",
-    )
-    .with_cause(format!("{}: {}", err.code, err.message))
+    DomainError::new("connection.deleteFailed", "Failed to delete the folder.")
+        .with_cause(format!("{}: {}", err.code, err.message))
 }
 
 #[cfg(test)]
@@ -1128,11 +1111,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl CredentialStore for MockCredentialStore {
-        async fn save(
-            &self,
-            key: CredentialKey,
-            secret: Secret,
-        ) -> Result<(), CredentialError> {
+        async fn save(&self, key: CredentialKey, secret: Secret) -> Result<(), CredentialError> {
             self.entries
                 .lock()
                 .unwrap()
@@ -1379,7 +1358,11 @@ mod tests {
         // Requirement 2.7: the gate is signalled by a stable code...
         assert_eq!(err.code, CONFIRMATION_REQUIRED_CODE);
         // ...and nothing was removed from either store.
-        assert!(manager.database().get_profile(created.id).unwrap().is_some());
+        assert!(manager
+            .database()
+            .get_profile(created.id)
+            .unwrap()
+            .is_some());
         assert!(manager.credentials().contains(&key));
     }
 
@@ -1397,7 +1380,11 @@ mod tests {
         manager.delete_profile(created.id, true).await.unwrap();
 
         // Requirement 2.8: the profile is gone.
-        assert!(manager.database().get_profile(created.id).unwrap().is_none());
+        assert!(manager
+            .database()
+            .get_profile(created.id)
+            .unwrap()
+            .is_none());
         // Requirement 11.6 (wired here): its credential is gone too.
         assert!(!manager.credentials().contains(&key));
     }
@@ -1406,7 +1393,10 @@ mod tests {
     async fn confirmed_delete_of_missing_profile_is_a_benign_no_op() {
         let manager = manager();
         // No such profile; confirmed deletion still succeeds (idempotent).
-        manager.delete_profile(ProfileId::new(), true).await.unwrap();
+        manager
+            .delete_profile(ProfileId::new(), true)
+            .await
+            .unwrap();
     }
 
     // --- Folder name validation (task 3.8) ---------------------------------
@@ -1721,9 +1711,7 @@ mod tests {
         let mut parent: Option<FolderId> = None;
         let mut ids = Vec::new();
         for i in 0..=MAX_FOLDER_DEPTH {
-            let folder = manager
-                .create_folder(format!("level{i}"), parent)
-                .unwrap();
+            let folder = manager.create_folder(format!("level{i}"), parent).unwrap();
             parent = Some(folder.id);
             ids.push(folder.id);
         }
@@ -1806,7 +1794,11 @@ mod tests {
         // Requirement 3.6/3.8: the gate is signalled and nothing is removed.
         assert_eq!(err.code, CONFIRMATION_REQUIRED_CODE);
         assert!(manager.database().get_folder(folder.id).unwrap().is_some());
-        assert!(manager.database().get_profile(profile.id).unwrap().is_some());
+        assert!(manager
+            .database()
+            .get_profile(profile.id)
+            .unwrap()
+            .is_some());
         assert!(manager
             .credentials()
             .contains(&profile_password_key(profile.id)));
@@ -1833,7 +1825,11 @@ mod tests {
         assert!(manager.database().get_folder(root.id).unwrap().is_none());
         assert!(manager.database().get_folder(child.id).unwrap().is_none());
         assert!(manager.database().get_profile(p_root.id).unwrap().is_none());
-        assert!(manager.database().get_profile(p_child.id).unwrap().is_none());
+        assert!(manager
+            .database()
+            .get_profile(p_child.id)
+            .unwrap()
+            .is_none());
         // Requirement 11.6: the contained profiles' credentials are cleaned.
         assert!(!manager
             .credentials()
@@ -1844,7 +1840,11 @@ mod tests {
 
         // Everything outside the subtree is untouched.
         assert!(manager.database().get_folder(outside.id).unwrap().is_some());
-        assert!(manager.database().get_profile(p_outside.id).unwrap().is_some());
+        assert!(manager
+            .database()
+            .get_profile(p_outside.id)
+            .unwrap()
+            .is_some());
         assert!(manager
             .credentials()
             .contains(&profile_password_key(p_outside.id)));
@@ -1875,7 +1875,11 @@ mod tests {
         // remain unchanged.
         assert!(manager.database().get_folder(root.id).unwrap().is_some());
         assert!(manager.database().get_folder(child.id).unwrap().is_some());
-        assert!(manager.database().get_profile(p_child.id).unwrap().is_some());
+        assert!(manager
+            .database()
+            .get_profile(p_child.id)
+            .unwrap()
+            .is_some());
         assert!(manager
             .credentials()
             .contains(&profile_password_key(p_child.id)));
@@ -1903,10 +1907,7 @@ mod tests {
     #[tokio::test]
     async fn confirmed_delete_of_missing_folder_is_a_benign_no_op() {
         let manager = manager();
-        let summary = manager
-            .delete_folder(FolderId::new(), true)
-            .await
-            .unwrap();
+        let summary = manager.delete_folder(FolderId::new(), true).await.unwrap();
         assert!(summary.folders.is_empty());
         assert!(summary.profiles.is_empty());
     }
@@ -1984,8 +1985,16 @@ mod tests {
         assert_eq!(summary.profiles_added, 1);
 
         // Pre-existing items are untouched (Requirement 16.2).
-        assert!(target.database().get_folder(existing_folder.id).unwrap().is_some());
-        assert!(target.database().get_profile(existing_profile.id).unwrap().is_some());
+        assert!(target
+            .database()
+            .get_folder(existing_folder.id)
+            .unwrap()
+            .is_some());
+        assert!(target
+            .database()
+            .get_profile(existing_profile.id)
+            .unwrap()
+            .is_some());
 
         // Total is existing + imported.
         assert_eq!(target.database().list_folders().unwrap().len(), 2);
@@ -2037,7 +2046,11 @@ mod tests {
 
         // Nothing added, existing profile intact.
         assert_eq!(target.database().list_profiles().unwrap().len(), 1);
-        assert!(target.database().get_profile(existing.id).unwrap().is_some());
+        assert!(target
+            .database()
+            .get_profile(existing.id)
+            .unwrap()
+            .is_some());
     }
 
     #[test]
@@ -2088,14 +2101,22 @@ mod tests {
         let err = manager.delete_profile(created.id, false).await.unwrap_err();
         assert_eq!(err.code, CONFIRMATION_REQUIRED_CODE);
         assert!(
-            manager.database().get_profile(created.id).unwrap().is_some(),
+            manager
+                .database()
+                .get_profile(created.id)
+                .unwrap()
+                .is_some(),
             "the profile must still exist until deletion is confirmed"
         );
 
         // Confirming then removes it, proving the gate was the only thing
         // standing between request and removal (Requirement 2.8).
         manager.delete_profile(created.id, true).await.unwrap();
-        assert!(manager.database().get_profile(created.id).unwrap().is_none());
+        assert!(manager
+            .database()
+            .get_profile(created.id)
+            .unwrap()
+            .is_none());
     }
 
     /// Task 3.16 (Requirement 3.6): deleting a folder that *contains profiles*
@@ -2118,7 +2139,11 @@ mod tests {
             "the folder must still exist until deletion is confirmed"
         );
         assert!(
-            manager.database().get_profile(profile.id).unwrap().is_some(),
+            manager
+                .database()
+                .get_profile(profile.id)
+                .unwrap()
+                .is_some(),
             "the contained profile must still exist until deletion is confirmed"
         );
 
@@ -2213,7 +2238,10 @@ mod tests {
 
         /// Assert two profiles agree on every *submitted* field (i.e. everything
         /// but the manager-assigned id), used to prove faithful persistence.
-        fn assert_fields_eq(stored: &ConnectionProfile, draft: &ProfileDraft) -> Result<(), TestCaseError> {
+        fn assert_fields_eq(
+            stored: &ConnectionProfile,
+            draft: &ProfileDraft,
+        ) -> Result<(), TestCaseError> {
             prop_assert_eq!(&stored.name, &draft.name);
             prop_assert_eq!(stored.protocol, draft.protocol);
             prop_assert_eq!(&stored.host, &draft.host);

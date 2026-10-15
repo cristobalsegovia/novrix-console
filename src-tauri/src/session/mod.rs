@@ -159,7 +159,11 @@ pub struct SessionSource {
 
 impl SessionSource {
     /// Wrap an established connection and its origin.
-    pub fn new(kind: ProtocolKind, profile_id: Option<ProfileId>, conn: Box<dyn SessionConn>) -> Self {
+    pub fn new(
+        kind: ProtocolKind,
+        profile_id: Option<ProfileId>,
+        conn: Box<dyn SessionConn>,
+    ) -> Self {
         Self {
             profile_id,
             kind,
@@ -415,10 +419,12 @@ impl SessionManager {
     pub async fn close_tab(&self, id: SessionId, confirmed: bool) -> Result<(), DomainError> {
         let mut state = self.inner.lock().await;
 
-        let handle = state
-            .sessions
-            .get(&id)
-            .ok_or_else(|| DomainError::new(SESSION_NOT_FOUND_CODE, "No open session hosts the requested tab."))?;
+        let handle = state.sessions.get(&id).ok_or_else(|| {
+            DomainError::new(
+                SESSION_NOT_FOUND_CODE,
+                "No open session hosts the requested tab.",
+            )
+        })?;
 
         // Requirement 9.7: an active (connected) session requires confirmation.
         let is_active = { *handle.state.read().await == SessionState::Connected };
@@ -471,14 +477,15 @@ impl SessionManager {
     /// guarantee, Property 22).
     pub async fn send_input(&self, id: SessionId, bytes: Vec<u8>) -> Result<(), DomainError> {
         let state = self.inner.lock().await;
-        let handle = state
-            .sessions
-            .get(&id)
-            .ok_or_else(|| DomainError::new(SESSION_NOT_FOUND_CODE, "No open session hosts the requested tab."))?;
-        handle
-            .input_tx
-            .send(bytes)
-            .map_err(|_| DomainError::new("session.writeClosed", "The session's write path is closed."))
+        let handle = state.sessions.get(&id).ok_or_else(|| {
+            DomainError::new(
+                SESSION_NOT_FOUND_CODE,
+                "No open session hosts the requested tab.",
+            )
+        })?;
+        handle.input_tx.send(bytes).map_err(|_| {
+            DomainError::new("session.writeClosed", "The session's write path is closed.")
+        })
     }
 
     /// The current state of the Session hosted by `id`, or `None` if there is no
@@ -596,7 +603,12 @@ mod tests {
     impl MockConn {
         fn new(
             state: SessionState,
-        ) -> (Self, tmpsc::UnboundedSender<Option<Vec<u8>>>, Arc<AtomicBool>, Arc<Mutex<Vec<Vec<u8>>>>) {
+        ) -> (
+            Self,
+            tmpsc::UnboundedSender<Option<Vec<u8>>>,
+            Arc<AtomicBool>,
+            Arc<Mutex<Vec<Vec<u8>>>>,
+        ) {
             let (tx, rx) = tmpsc::unbounded_channel();
             let closed = Arc::new(AtomicBool::new(false));
             let sent = Arc::new(Mutex::new(Vec::new()));
@@ -639,7 +651,14 @@ mod tests {
         }
     }
 
-    fn source(state: SessionState) -> (SessionSource, tmpsc::UnboundedSender<Option<Vec<u8>>>, Arc<AtomicBool>, Arc<Mutex<Vec<Vec<u8>>>>) {
+    fn source(
+        state: SessionState,
+    ) -> (
+        SessionSource,
+        tmpsc::UnboundedSender<Option<Vec<u8>>>,
+        Arc<AtomicBool>,
+        Arc<Mutex<Vec<Vec<u8>>>>,
+    ) {
         let (conn, recv_tx, closed, sent) = MockConn::new(state);
         let src = SessionSource::new(ProtocolKind::Ssh, None, Box::new(conn));
         (src, recv_tx, closed, sent)
@@ -891,7 +910,10 @@ mod tests {
         assert_eq!(mgr.open_count().await, 1);
         assert_eq!(mgr.active_tab().await, Some(id));
         assert_eq!(mgr.session_state(id).await, Some(SessionState::Connected));
-        assert!(!closed.load(Ordering::SeqCst), "declining must not release the connection");
+        assert!(
+            !closed.load(Ordering::SeqCst),
+            "declining must not release the connection"
+        );
 
         // A second decline is just as inert — the gate is stable across retries.
         let err2 = mgr.close_tab(id, false).await.unwrap_err();
@@ -903,7 +925,10 @@ mod tests {
         mgr.close_tab(id, true).await.unwrap();
         assert_eq!(mgr.open_count().await, 0);
         assert_eq!(mgr.active_tab().await, None);
-        assert!(closed.load(Ordering::SeqCst), "confirming must release the connection");
+        assert!(
+            closed.load(Ordering::SeqCst),
+            "confirming must release the connection"
+        );
     }
 
     /// Property-based tests for the Session_Manager (tasks 13.2–13.5).

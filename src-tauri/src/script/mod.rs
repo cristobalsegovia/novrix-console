@@ -283,9 +283,12 @@ impl<C: Clock> ScriptEngine for DefaultScriptEngine<C> {
             // the state before sending catches a disconnect that happened
             // between steps and stops with the current command unsent (req 15.4).
             if session.state() == SessionState::Disconnected {
-                return finish(index, ScriptError::Disconnected {
-                    command_index: index,
-                });
+                return finish(
+                    index,
+                    ScriptError::Disconnected {
+                        command_index: index,
+                    },
+                );
             }
 
             // (req 15.1, Property 47) Send this step's command, in order. Append
@@ -296,9 +299,12 @@ impl<C: Clock> ScriptEngine for DefaultScriptEngine<C> {
             if let Err(_e) = session.send(&line).await {
                 // A send failure means the transport is gone; treat it as a
                 // disconnection at this command (req 15.4).
-                return finish(index, ScriptError::Disconnected {
-                    command_index: index,
-                });
+                return finish(
+                    index,
+                    ScriptError::Disconnected {
+                        command_index: index,
+                    },
+                );
             }
 
             // (req 15.2, Property 48) If this step gates on a prompt, hold the

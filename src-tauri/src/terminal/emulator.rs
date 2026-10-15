@@ -390,7 +390,11 @@ mod tests {
         term.advance(b"\x1b[38;2;10;20;30mA");
         assert_eq!(
             term.grid().cell(0, 0).unwrap().style.foreground,
-            Color::Rgb { r: 10, g: 20, b: 30 }
+            Color::Rgb {
+                r: 10,
+                g: 20,
+                b: 30
+            }
         );
         term.advance(b"\x1b[48;5;123mB");
         assert_eq!(
@@ -429,10 +433,28 @@ mod tests {
     fn resize_reports_new_dimensions() {
         let mut term = TerminalEmulator::new(80, 24);
         let dims = term.resize(100, 40);
-        assert_eq!(dims, Dimensions { cols: 100, rows: 40 });
-        assert_eq!(term.dimensions(), Dimensions { cols: 100, rows: 40 });
+        assert_eq!(
+            dims,
+            Dimensions {
+                cols: 100,
+                rows: 40
+            }
+        );
+        assert_eq!(
+            term.dimensions(),
+            Dimensions {
+                cols: 100,
+                rows: 40
+            }
+        );
         // The report is drained exactly once.
-        assert_eq!(term.take_resize_report(), Some(Dimensions { cols: 100, rows: 40 }));
+        assert_eq!(
+            term.take_resize_report(),
+            Some(Dimensions {
+                cols: 100,
+                rows: 40
+            })
+        );
         assert_eq!(term.take_resize_report(), None);
     }
 }

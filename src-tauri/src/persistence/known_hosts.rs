@@ -108,11 +108,7 @@ pub enum TrustDecision {
 /// must not re-prompt. The documented recovery path is an explicit user action
 /// to *forget* the old entry (see [`KnownHostsStore::forget`]); only after that
 /// does the host look unknown again and the normal prompt flow apply.
-pub fn decide_trust(
-    stored: Option<&str>,
-    presented: &str,
-    policy: HostKeyPolicy,
-) -> TrustDecision {
+pub fn decide_trust(stored: Option<&str>, presented: &str, policy: HostKeyPolicy) -> TrustDecision {
     match stored {
         // Known host: trust iff the fingerprint is unchanged, otherwise a hard
         // reject (never a silent re-prompt).
@@ -232,12 +228,7 @@ impl KnownHostsStore {
     /// an absent entry is a no-op success. Wiring a user-facing "forget host
     /// key" command on top of this is left as a follow-up (see the IPC layer's
     /// `TODO`).
-    pub fn forget(
-        &self,
-        host: &str,
-        port: u16,
-        kind: TrustKind,
-    ) -> Result<(), DomainError> {
+    pub fn forget(&self, host: &str, port: u16, kind: TrustKind) -> Result<(), DomainError> {
         self.with_conn("forget a known-host entry", |conn| {
             conn.execute(
                 "DELETE FROM known_hosts WHERE host = ?1 AND port = ?2 AND kind = ?3",
@@ -250,11 +241,8 @@ impl KnownHostsStore {
 
 /// Build a [`DomainError`] for a known-hosts storage failure.
 fn known_hosts_error(action: &str, cause: impl std::fmt::Display) -> DomainError {
-    DomainError::new(
-        "persistence.knownHosts",
-        format!("Failed to {action}."),
-    )
-    .with_cause(cause.to_string())
+    DomainError::new("persistence.knownHosts", format!("Failed to {action}."))
+        .with_cause(cause.to_string())
 }
 
 #[cfg(test)]
@@ -404,11 +392,21 @@ mod tests {
         let policy = HostKeyPolicy::PromptOnUnknown;
 
         let stored = s.get("h", 22, TrustKind::SshHostKey).unwrap();
-        assert_eq!(decide_trust(stored.as_deref(), "SHA256:k1", policy), TrustDecision::Prompt);
+        assert_eq!(
+            decide_trust(stored.as_deref(), "SHA256:k1", policy),
+            TrustDecision::Prompt
+        );
 
-        s.remember("h", 22, TrustKind::SshHostKey, "SHA256:k1").unwrap();
+        s.remember("h", 22, TrustKind::SshHostKey, "SHA256:k1")
+            .unwrap();
         let stored = s.get("h", 22, TrustKind::SshHostKey).unwrap();
-        assert_eq!(decide_trust(stored.as_deref(), "SHA256:k1", policy), TrustDecision::Proceed);
-        assert_eq!(decide_trust(stored.as_deref(), "SHA256:k2", policy), TrustDecision::Reject);
+        assert_eq!(
+            decide_trust(stored.as_deref(), "SHA256:k1", policy),
+            TrustDecision::Proceed
+        );
+        assert_eq!(
+            decide_trust(stored.as_deref(), "SHA256:k2", policy),
+            TrustDecision::Reject
+        );
     }
 }

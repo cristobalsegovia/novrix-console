@@ -148,9 +148,7 @@ impl<S: SecureStore> CredentialStore for KeyringCredentialStore<S> {
         // enumerated, so deletion targets the keys the Credential_Store itself
         // owns for a profile (see `profile_credential_key`). `delete` is
         // idempotent, so absent entries are not treated as failures.
-        self.backend
-            .delete(profile_password_key(id).as_str())
-            .await
+        self.backend.delete(profile_password_key(id).as_str()).await
     }
 }
 
@@ -220,10 +218,7 @@ mod tests {
     #[tokio::test]
     async fn get_missing_credential_returns_not_found_and_no_value() {
         let store = KeyringCredentialStore::new(InMemoryStore::default());
-        let err = store
-            .get(CredentialKey::new("absent"))
-            .await
-            .unwrap_err();
+        let err = store.get(CredentialKey::new("absent")).await.unwrap_err();
         assert_eq!(err, CredentialError::NotFound);
     }
 
@@ -234,10 +229,7 @@ mod tests {
         let key = CredentialKey::new("profile/x/password");
 
         // Seed a previously stored value.
-        store
-            .save(key.clone(), Secret::new("old"))
-            .await
-            .unwrap();
+        store.save(key.clone(), Secret::new("old")).await.unwrap();
 
         // Arrange for the next save to fail.
         store.backend().fail_next_set();

@@ -641,8 +641,10 @@ impl DefaultFileTransferService {
         if let Err(e) = Box::new(writer).finish().await {
             return TransferOutcome::Failed(e.to_string());
         }
-        self.progress
-            .report(session, TransferProgress::new(transferred.max(total), total));
+        self.progress.report(
+            session,
+            TransferProgress::new(transferred.max(total), total),
+        );
         TransferOutcome::Completed
     }
 }
@@ -819,10 +821,7 @@ pub trait SftpSessionProvider: Send + Sync {
     /// Returns [`TransferError::Io`] if the session is unknown or its SFTP
     /// channel is not available (e.g. not an SSH session, or not yet
     /// connected).
-    async fn sftp_session(
-        &self,
-        session: SessionId,
-    ) -> Result<SharedSftpSession, TransferError>;
+    async fn sftp_session(&self, session: SessionId) -> Result<SharedSftpSession, TransferError>;
 }
 
 /// The real [`SftpBackend`] over `russh-sftp` v2.
@@ -1023,11 +1022,9 @@ impl SftpBackend for RusshSftpBackend {
                     .await
                     .map_err(|e| TransferError::Io(e.to_string()))
             }
-            (TransferDirection::Download, Destination::Local(path)) => {
-                tokio::fs::try_exists(path)
-                    .await
-                    .map_err(|e| TransferError::Io(e.to_string()))
-            }
+            (TransferDirection::Download, Destination::Local(path)) => tokio::fs::try_exists(path)
+                .await
+                .map_err(|e| TransferError::Io(e.to_string())),
             // A destination side that does not match the direction is a
             // programming error in the caller; treat as non-existent rather
             // than guess.
@@ -1125,11 +1122,9 @@ impl SftpBackend for RusshSftpBackend {
                     .await
                     .map_err(|e| TransferError::Io(e.to_string()))
             }
-            (TransferDirection::Download, Destination::Local(path)) => {
-                tokio::fs::remove_file(path)
-                    .await
-                    .map_err(|e| TransferError::Io(e.to_string()))
-            }
+            (TransferDirection::Download, Destination::Local(path)) => tokio::fs::remove_file(path)
+                .await
+                .map_err(|e| TransferError::Io(e.to_string())),
             _ => Ok(()),
         }
     }
@@ -1422,7 +1417,8 @@ mod tests {
             fail_after_chunks: None,
         });
         let sink = Arc::new(RecordingSink::default());
-        let svc = DefaultFileTransferService::new(backend, Arc::clone(&sink) as Arc<dyn ProgressSink>);
+        let svc =
+            DefaultFileTransferService::new(backend, Arc::clone(&sink) as Arc<dyn ProgressSink>);
 
         let res = svc
             .upload(
@@ -1434,7 +1430,15 @@ mod tests {
             .await;
 
         assert!(res.is_ok());
-        assert_eq!(fs.lock().unwrap().written.get("/remote/a.bin").unwrap().len(), 10);
+        assert_eq!(
+            fs.lock()
+                .unwrap()
+                .written
+                .get("/remote/a.bin")
+                .unwrap()
+                .len(),
+            10
+        );
         let samples = sink.samples.lock().unwrap();
         assert_eq!(samples.last().unwrap().percentage, 100);
         assert!(fs.lock().unwrap().removed.is_empty());
@@ -1503,7 +1507,12 @@ mod tests {
 
         assert!(matches!(res, Err(TransferError::Failed(_))));
         // Nothing was written.
-        assert!(fs.lock().unwrap().written.get("/remote/exists.bin").is_none());
+        assert!(fs
+            .lock()
+            .unwrap()
+            .written
+            .get("/remote/exists.bin")
+            .is_none());
     }
 
     #[tokio::test]
@@ -1547,15 +1556,14 @@ mod tests {
             Arc::new(NullProgressSink) as Arc<dyn ProgressSink>,
         );
 
-        let ok = svc
-            .list_remote(session(), RemotePath::new("/ok"))
-            .await;
+        let ok = svc.list_remote(session(), RemotePath::new("/ok")).await;
         assert!(ok.is_ok());
 
-        let denied = svc
-            .list_remote(session(), RemotePath::new("/denied"))
-            .await;
-        assert!(matches!(denied, Err(TransferError::DirectoryInaccessible(_))));
+        let denied = svc.list_remote(session(), RemotePath::new("/denied")).await;
+        assert!(matches!(
+            denied,
+            Err(TransferError::DirectoryInaccessible(_))
+        ));
     }
 
     // --- Unit test: overwrite confirmation (task 15.5, req 13.7) ---------
@@ -1646,9 +1654,17 @@ mod tests {
                 ConflictPolicy::Overwrite,
             )
             .await;
-        assert!(res.is_ok(), "Overwrite must proceed over an existing destination");
+        assert!(
+            res.is_ok(),
+            "Overwrite must proceed over an existing destination"
+        );
         assert_eq!(
-            fs.lock().unwrap().written.get("/remote/dest.bin").unwrap().len(),
+            fs.lock()
+                .unwrap()
+                .written
+                .get("/remote/dest.bin")
+                .unwrap()
+                .len(),
             12
         );
     }

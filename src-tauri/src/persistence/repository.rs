@@ -266,11 +266,7 @@ impl Database {
     /// Read a single profile by id, or `None` if it does not exist.
     pub fn get_profile(&self, id: ProfileId) -> Result<Option<ConnectionProfile>, DomainError> {
         self.connection()
-            .query_row(
-                PROFILE_SELECT,
-                [id.to_string()],
-                map_profile_row,
-            )
+            .query_row(PROFILE_SELECT, [id.to_string()], map_profile_row)
             .optional()
             .map_err(|e| read_error("Failed to read profile", e))?
             .transpose()
@@ -518,9 +514,11 @@ fn map_profile_row(row: &Row<'_>) -> rusqlite::Result<Result<ConnectionProfile, 
 fn auth_to_columns(auth: &AuthConfig) -> (String, Option<String>, Option<String>) {
     match auth {
         AuthConfig::None => ("none".to_string(), None, None),
-        AuthConfig::Password { credential_key } => {
-            ("password".to_string(), Some(credential_key.as_str().to_string()), None)
-        }
+        AuthConfig::Password { credential_key } => (
+            "password".to_string(),
+            Some(credential_key.as_str().to_string()),
+            None,
+        ),
         AuthConfig::SshKey { key_id } => ("sshKey".to_string(), None, Some(key_id.to_string())),
     }
 }
@@ -536,7 +534,10 @@ fn auth_from_columns(
         "none" => Ok(AuthConfig::None),
         "password" => {
             let key = credential_key.ok_or_else(|| {
-                deserialize_simple("auth.credential_key", "password auth is missing credential_key")
+                deserialize_simple(
+                    "auth.credential_key",
+                    "password auth is missing credential_key",
+                )
             })?;
             Ok(AuthConfig::Password {
                 credential_key: CredentialKey::new(key),
@@ -588,8 +589,10 @@ fn protocol_from_str(s: &str) -> Result<ProtocolKind, DomainError> {
 
 /// Parse a stored UUID string, mapping a malformed value to a domain error.
 fn parse_uuid(s: &str, field: &str) -> Result<uuid::Uuid, DomainError> {
-    uuid::Uuid::parse_str(s)
-        .map_err(|e| DomainError::new(ERR_DESERIALIZE, format!("Invalid UUID for {field}")).with_cause(e.to_string()))
+    uuid::Uuid::parse_str(s).map_err(|e| {
+        DomainError::new(ERR_DESERIALIZE, format!("Invalid UUID for {field}"))
+            .with_cause(e.to_string())
+    })
 }
 
 /// Collect an iterator of per-row `Result<Result<T, DomainError>, rusqlite::Error>`
@@ -647,9 +650,10 @@ impl RepoError {
     fn into_domain(self) -> DomainError {
         match self {
             RepoError::Sqlite(e) => write_error("Write operation failed", e),
-            RepoError::NotFound { entity, id } => {
-                DomainError::new("persistence.notFound", format!("No {entity} found for id {id}"))
-            }
+            RepoError::NotFound { entity, id } => DomainError::new(
+                "persistence.notFound",
+                format!("No {entity} found for id {id}"),
+            ),
         }
     }
 }
@@ -856,7 +860,9 @@ mod tests {
         profile.host = "renamed.example".to_string();
         profile.port = 2200;
         profile.folder_id = Some(other_folder.id);
-        profile.auth = AuthConfig::SshKey { key_id: KeyId::new() };
+        profile.auth = AuthConfig::SshKey {
+            key_id: KeyId::new(),
+        };
         profile.logging_enabled = true;
         profile.connect_timeout_secs = 90;
         db.update_profile(&profile).unwrap();
@@ -899,7 +905,11 @@ mod tests {
 
         let in_a = db.list_profiles_in_folder(folder_a.id).unwrap();
         let names: Vec<&str> = in_a.iter().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, vec!["alpha", "zulu"], "sorted by name, folder A only");
+        assert_eq!(
+            names,
+            vec!["alpha", "zulu"],
+            "sorted by name, folder A only"
+        );
 
         let in_b = db.list_profiles_in_folder(folder_b.id).unwrap();
         assert_eq!(in_b.len(), 1);
@@ -956,7 +966,9 @@ mod tests {
 
         // Updating a profile whose id was never stored must report notFound and
         // leave the one existing profile exactly as it was.
-        let err = db.update_profile(&sample_profile(Some(folder.id))).unwrap_err();
+        let err = db
+            .update_profile(&sample_profile(Some(folder.id)))
+            .unwrap_err();
         assert_eq!(err.code, "persistence.notFound");
 
         let all = db.list_profiles().unwrap();
@@ -1021,7 +1033,9 @@ mod tests {
         let profile = profile_with(
             None,
             ProtocolKind::Ssh,
-            AuthConfig::SshKey { key_id: KeyId::new() },
+            AuthConfig::SshKey {
+                key_id: KeyId::new(),
+            },
             ProtocolParams::Ssh {
                 known_host_policy: HostKeyPolicy::AcceptAny,
             },
@@ -1106,6 +1120,9 @@ mod tests {
             ProtocolParams::Rdp { resolution: None },
         );
         db.insert_profile(&without_res).unwrap();
-        assert_eq!(db.get_profile(without_res.id).unwrap().unwrap(), without_res);
+        assert_eq!(
+            db.get_profile(without_res.id).unwrap().unwrap(),
+            without_res
+        );
     }
 }
