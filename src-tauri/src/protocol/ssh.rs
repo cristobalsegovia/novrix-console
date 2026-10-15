@@ -59,7 +59,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use russh::client::{self, Handle};
 use russh::keys::{decode_secret_key, HashAlg, PrivateKey, PrivateKeyWithHashAlg};
-use russh::{Channel, ChannelMsg};
+use russh::{ChannelMsg, ChannelReadHalf, ChannelWriteHalf};
 use tokio::sync::Mutex;
 
 use crate::domain::{AuthConfig, CredentialKey, KeyId, ProtocolError, ProtocolKind, SessionState};
@@ -533,7 +533,11 @@ impl SshProtocol {
             .await
             .map_err(map_transport_error)?;
 
-        Ok(SshSession::connected(handle, channel))
+        // Split the channel so reads (`recv`) and writes (`send`/`resize`) use
+        // independent halves — a `recv` blocked waiting for output must never
+        // hold a lock that a keystroke write needs (the black-screen deadlock).
+        let (reader, writer) = channel.split();
+        Ok(SshSession::connected(handle, reader, writer))
     }
 }
 
@@ -673,18 +677,29 @@ fn map_transport_error(err: russh::Error) -> ProtocolError {
 pub struct SshSession {
     state: Arc<Mutex<SessionState>>,
     /// The live transport, present only while connected. Taken on `close`.
+    ///
+    /// Read and write live behind *separate* mutexes so a `recv` blocked in
+    /// `ChannelReadHalf::wait` (waiting for remote output) never holds a lock
+    /// that `send`/`resize` need. Holding one lock across the blocking read was
+    /// a deadlock: the Session_Manager's read loop parks in `recv` with the
+    /// lock held, so keystrokes could never be written and the terminal stayed
+    /// black. Splitting the channel removes the contention entirely.
     transport: Mutex<Option<Transport>>,
 }
 
 /// The owned, live SSH transport for a connected [`SshSession`]: the client
-/// handle plus the opened session channel.
+/// handle plus the split read/write halves of the session channel.
 struct Transport {
     // Held to keep the connection alive: russh tears the transport down when
     // the handle is dropped, so ownership here is the point even though no
-    // method reads it directly (the channel carries all session I/O).
+    // method reads it directly (the channel halves carry all session I/O).
     #[allow(dead_code)]
     handle: Handle<ClientHandler>,
-    channel: Channel<client::Msg>,
+    /// Reading side (`recv`), behind its own mutex. A blocking `wait` here does
+    /// not block writes.
+    reader: Mutex<ChannelReadHalf>,
+    /// Writing side (`send`/`resize`), behind its own mutex. Its ops are short.
+    writer: Mutex<ChannelWriteHalf<client::Msg>>,
 }
 
 impl SshSession {
@@ -699,12 +714,21 @@ impl SshSession {
         }
     }
 
-    /// A `Connected` session owning the live russh handle and session channel.
-    /// Built by [`SshProtocol::establish`] on the success path only.
-    fn connected(handle: Handle<ClientHandler>, channel: Channel<client::Msg>) -> Self {
+    /// A `Connected` session owning the live russh handle and the split
+    /// read/write halves of the session channel. Built by
+    /// [`SshProtocol::establish_session`] on the success path only.
+    fn connected(
+        handle: Handle<ClientHandler>,
+        reader: ChannelReadHalf,
+        writer: ChannelWriteHalf<client::Msg>,
+    ) -> Self {
         Self {
             state: Arc::new(Mutex::new(SessionState::Connected)),
-            transport: Mutex::new(Some(Transport { handle, channel })),
+            transport: Mutex::new(Some(Transport {
+                handle,
+                reader: Mutex::new(reader),
+                writer: Mutex::new(writer),
+            })),
         }
     }
 
@@ -754,30 +778,38 @@ impl SshSession {
 #[async_trait]
 impl SessionConn for SshSession {
     async fn send(&mut self, data: &[u8]) -> Result<(), ProtocolError> {
+        // Lock only the write half, so a concurrent `recv` blocked on the read
+        // half does not stall this write (and vice versa).
         let guard = self.transport.lock().await;
         let transport = guard.as_ref().ok_or_else(session_closed)?;
+        let writer = transport.writer.lock().await;
         // `&[u8]` is an `AsyncRead`, so russh writes exactly these bytes to the
         // channel as a single data message.
-        transport
-            .channel
-            .data(data)
-            .await
-            .map_err(map_transport_error)
+        writer.data(data).await.map_err(map_transport_error)
     }
 
     async fn recv(&mut self) -> Result<Option<Vec<u8>>, ProtocolError> {
-        let mut guard = self.transport.lock().await;
-        let transport = match guard.as_mut() {
+        // Clone the reader's Arc-free handle by locking the transport only long
+        // enough to reach the reader mutex, then release the outer guard so a
+        // concurrent `send`/`resize` can proceed while this read blocks.
+        //
+        // The reader mutex itself is held across `wait()` — but that is the
+        // *read* half only, so writes (which use the separate write mutex) are
+        // never blocked by a parked read. This is the fix for the black-screen
+        // deadlock.
+        let outer = self.transport.lock().await;
+        let transport = match outer.as_ref() {
             Some(t) => t,
             // No transport: a closed session is at clean EOF.
             None => return Ok(None),
         };
+        let mut reader = transport.reader.lock().await;
 
         // Pull channel messages until the next chunk of output arrives. EOF or
         // a channel close is a clean end of stream (`Ok(None)`); other control
         // messages (window adjust, requests, exit status) are skipped.
         loop {
-            match transport.channel.wait().await {
+            match reader.wait().await {
                 Some(ChannelMsg::Data { data }) => {
                     return Ok(Some(data.to_vec()));
                 }
@@ -798,8 +830,8 @@ impl SessionConn for SshSession {
     async fn resize(&mut self, cols: u16, rows: u16) -> Result<(), ProtocolError> {
         let guard = self.transport.lock().await;
         let transport = guard.as_ref().ok_or_else(session_closed)?;
-        transport
-            .channel
+        let writer = transport.writer.lock().await;
+        writer
             .window_change(cols as u32, rows as u32, 0, 0)
             .await
             .map_err(map_transport_error)
@@ -811,9 +843,9 @@ impl SessionConn for SshSession {
         // `None` and is a no-op.
         *self.state.lock().await = SessionState::Disconnected;
         if let Some(transport) = self.transport.lock().await.take() {
-            // Best-effort channel close; dropping the handle below closes the
-            // connection regardless of whether the server acks this.
-            let _ = transport.channel.close().await;
+            // Dropping the handle (and the channel halves) tears the russh
+            // transport down; russh sends the channel close/EOF as part of that
+            // teardown, so no explicit close call is needed.
             drop(transport);
         }
         Ok(())
