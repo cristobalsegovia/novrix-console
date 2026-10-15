@@ -215,10 +215,16 @@ mod tests {
 
     #[test]
     fn file_factory_rejects_missing_directory() {
+        // Build a path whose *parent directory* provably does not exist, in an
+        // OS-portable way: a unique, non-existent subdirectory under the real
+        // temp dir. A hard-coded Unix path like "/this/does/not/exist" is not
+        // portable — on Windows a leading "/" resolves against the current
+        // drive and may behave differently — so anchor to `temp_dir()` instead.
         let factory = FileSinkFactory;
-        let err = factory
-            .open(Path::new("/this/path/does/not/exist/session.log"))
-            .unwrap_err();
+        let missing = std::env::temp_dir()
+            .join("novrix-nonexistent-dir-9f3a1c7b")
+            .join("session.log");
+        let err = factory.open(&missing).unwrap_err();
         assert!(matches!(err, LogError::InvalidDestination(_)));
     }
 }
