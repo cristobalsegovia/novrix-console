@@ -20,6 +20,8 @@ import {
   asDomainError,
   saveProfile,
   updateProfile,
+  saveCredential,
+  hasCredential,
   type AuthConfig,
   type BaudRate,
   type ConnectionProfile,
@@ -174,9 +176,15 @@ function ProfileForm(props: ProfileFormProps) {
   const [authKind, setAuthKind] = useState<AuthKind>(
     editing?.auth.type ?? "none",
   );
-  const [credentialKey, setCredentialKey] = useState(
-    editing?.auth.type === "password" ? editing.auth.credential_key : "",
-  );
+  // Password entry (Requirement 17). The field holds a *newly typed* secret;
+  // it is intentionally never seeded from the stored credential (the secret is
+  // never read back to the UI). `passwordTouched` distinguishes "left as-is"
+  // (preserve the stored secret) from "cleared" (remove it). `hasStored`
+  // reflects whether a credential already exists for the edited profile.
+  const [password, setPassword] = useState("");
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [revealPassword, setRevealPassword] = useState(false);
+  const [hasStored, setHasStored] = useState(false);
   const [keyId, setKeyId] = useState(
     editing?.auth.type === "sshKey" ? editing.auth.key_id : "",
   );
@@ -222,12 +230,35 @@ function ProfileForm(props: ProfileFormProps) {
     });
   }, [serialPorts]);
 
+  // Reflect whether the edited profile already has a stored credential
+  // (Requirement 17.3). Presence only — the secret is never read back.
+  useEffect(() => {
+    let cancelled = false;
+    if (editing && editing.auth.type === "password") {
+      hasCredential(editing.id)
+        .then((present) => {
+          if (!cancelled) setHasStored(present);
+        })
+        .catch(() => {
+          // A presence-check failure is non-fatal; just leave the indicator off.
+        });
+    } else {
+      setHasStored(false);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [editing]);
+
   function buildAuth(): AuthConfig {
     switch (authKind) {
       case "none":
         return { type: "none" };
       case "password":
-        return { type: "password", credential_key: credentialKey };
+        // The backend normalizes a password profile's credential key to its
+        // own canonical key, so the UI submits a placeholder; the real secret
+        // is sent separately via saveCredential after the profile is saved.
+        return { type: "password", credential_key: "" };
       case "sshKey":
         return { type: "sshKey", key_id: keyId };
     }
@@ -268,6 +299,12 @@ function ProfileForm(props: ProfileFormProps) {
       const result = editing
         ? await updateProfile(editing.id, draft)
         : await saveProfile(draft);
+      // Persist the entered password separately (Requirement 17): only when the
+      // field was touched. `""` (cleared) removes the stored credential; a
+      // non-empty value saves it; an untouched field leaves it unchanged.
+      if (authKind === "password" && passwordTouched) {
+        await saveCredential(result.id, password);
+      }
       onSaved(result);
     } catch (err) {
       const domainErr = asDomainError(err);
@@ -503,16 +540,34 @@ function ProfileForm(props: ProfileFormProps) {
 
       {authKind === "password" ? (
         <div className="field">
-          <label htmlFor="pf-cred">Credential key reference</label>
-          <input
-            id="pf-cred"
-            type="text"
-            value={credentialKey}
-            onChange={(e) => setCredentialKey(e.target.value)}
-            placeholder="e.g. profile/prod-web/password"
-          />
+          <label htmlFor="pf-password">Password</label>
+          <div className="field-inline">
+            <input
+              id="pf-password"
+              type={revealPassword ? "text" : "password"}
+              value={password}
+              autoComplete="off"
+              placeholder={
+                hasStored ? "•••••••• (stored — leave blank to keep)" : "Enter password"
+              }
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPasswordTouched(true);
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-small"
+              aria-pressed={revealPassword}
+              onClick={() => setRevealPassword((r) => !r)}
+            >
+              {revealPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           <p className="field-hint">
-            A reference to the secret in OS storage, not the password itself.
+            {hasStored
+              ? "A credential is stored securely in your OS keychain. Leave blank to keep it, type a new one to replace it, or clear it and save to remove it."
+              : "Stored securely in your OS keychain (Keychain / Credential Manager), never in plaintext."}
           </p>
         </div>
       ) : null}

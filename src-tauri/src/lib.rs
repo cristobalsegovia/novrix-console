@@ -177,6 +177,8 @@ pub fn run() {
             ipc::update_profile,
             ipc::delete_profile,
             ipc::list_profiles,
+            ipc::save_credential,
+            ipc::has_credential,
             // Folders
             ipc::create_folder,
             ipc::rename_folder,

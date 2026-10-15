@@ -24,6 +24,7 @@ This document defines the functional requirements for the application. Technical
 - **Tab**: A user-interface element that hosts one active Session.
 - **Secure_Storage**: The operating system credential facility (for example, macOS Keychain or Windows Credential Manager) used by the Credential_Store.
 - **Supported_Protocol**: One of the connection protocols the System can establish: SSH, Telnet, Serial, or RDP.
+- **Command_Snippet**: A saved, reusable piece of text (typically a command or sequence of commands) that a user can send to a text-based Session with a single action.
 
 ## Requirements
 
@@ -246,3 +247,44 @@ This document defines the functional requirements for the application. Technical
 3. IF an imported configuration file is malformed or does not conform to the expected export file structure, THEN THE Connection_Manager SHALL reject the import, leave the existing configuration unchanged, and display an error message identifying the file as malformed.
 4. IF an imported Folder or Connection_Profile has an identifier that matches an existing Folder or Connection_Profile, THEN THE Connection_Manager SHALL add the imported item as a new entry rather than overwriting the existing one.
 5. WHEN a user completes an import successfully, THE Connection_Manager SHALL display a confirmation indicating the number of Folders and Connection_Profiles added.
+
+### Requirement 17: Enter and Store Connection Credentials
+
+**User Story:** As a user, I want to type a password or passphrase directly into a Connection_Profile and have it stored securely, so that I can save my login without manually managing credential references.
+
+#### Acceptance Criteria
+
+1. WHEN a user enters a password for a Connection_Profile whose authentication method is password and saves the profile, THE Credential_Store SHALL store the password in Secure_Storage associated with that Connection_Profile.
+2. THE System SHALL provide a password input field in the Connection_Profile editor that masks the entered characters by default and allows the user to reveal them.
+3. WHEN a user opens an existing Connection_Profile that has a stored password, THE System SHALL indicate that a credential is stored without displaying the stored secret in plaintext.
+4. IF a user leaves the password field unchanged while editing a Connection_Profile that already has a stored credential, THEN THE System SHALL retain the existing stored credential unchanged.
+5. WHEN a user clears the password field and saves a Connection_Profile that had a stored credential, THE Credential_Store SHALL remove the stored credential for that Connection_Profile.
+6. IF storing an entered credential in Secure_Storage fails, THEN THE System SHALL retain the unsaved password in the editor and display an error message indicating that the credential could not be stored, leaving the prior stored credential unchanged.
+7. THE System SHALL NOT write entered passwords or passphrases to the connection database or any export file in plaintext.
+
+### Requirement 18: Visual Experience and Usability
+
+**User Story:** As a user, I want a polished, legible interface, so that the application is comfortable and efficient to use for extended sessions.
+
+#### Acceptance Criteria
+
+1. THE System SHALL present a consistent visual layout across the profile sidebar, the profile editor, and the session area, using the application's defined color palette and typography.
+2. THE System SHALL support both a dark theme and a light theme and SHALL persist the user's selected theme across application restarts.
+3. WHEN an operation fails, THE System SHALL display an error message that is visually distinct from normal content and dismissible by the user.
+4. WHILE an asynchronous operation is in progress, THE System SHALL indicate the in-progress state to the user.
+5. THE System SHALL render interactive controls with a visible focus indicator and SHALL meet WCAG 2.1 AA contrast for text and essential controls in both themes.
+6. WHEN the application has no open sessions and no profile selected, THE System SHALL present guidance describing how to create or open a connection.
+
+### Requirement 19: Command Snippets
+
+**User Story:** As a user, I want to save reusable commands and send them to a session with one action, so that I can run frequent commands without retyping them.
+
+#### Acceptance Criteria
+
+1. WHEN a user creates a Command_Snippet with a name and command text, THE System SHALL save the Command_Snippet and make it available for reuse across application restarts.
+2. IF a user submits a Command_Snippet without a name or with empty command text, THEN THE System SHALL reject the submission and display a validation message identifying the missing field.
+3. WHEN a user edits or deletes a Command_Snippet, THE System SHALL apply the change and, for deletion, request confirmation before removing it.
+4. WHEN a user invokes a Command_Snippet while a text-based Session is active, THE System SHALL send the Command_Snippet's command text to that Session.
+5. IF a user invokes a Command_Snippet while no text-based Session is active, THEN THE System SHALL take no send action and SHALL indicate that an active text-based session is required.
+6. WHERE a Command_Snippet is restricted to a specific Supported_Protocol, THE System SHALL offer that Command_Snippet only for Sessions of that protocol.
+7. THE System SHALL exclude Command_Snippets from credential storage and SHALL store them in the connection database alongside Folders and Connection_Profiles.

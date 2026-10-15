@@ -44,10 +44,10 @@
 //! so the failure can be named. See [`save_failure`] for how a raw repository
 //! error is wrapped into a save-failure `DomainError`.
 
-use crate::credential::CredentialStore;
+use crate::credential::{profile_password_key, CredentialStore, Secret};
 use crate::domain::{
-    ConnectionProfile, DomainError, Folder, FolderId, ImportError, ProfileId, ProtocolKind,
-    ProtocolParams, ValidationError,
+    AuthConfig, ConnectionProfile, DomainError, Folder, FolderId, ImportError, ProfileId,
+    ProtocolKind, ProtocolParams, ValidationError,
 };
 use crate::persistence::Database;
 
@@ -132,6 +132,18 @@ impl ProfileDraft {
     /// This performs no validation itself; callers must have run
     /// [`validate_draft`] first.
     fn into_profile(self, id: ProfileId) -> ConnectionProfile {
+        // Normalize a password profile's credential key to the profile's own
+        // canonical key (`profile/{id}/password`). The UI no longer asks the
+        // user for a raw credential-key reference; the key is derived from the
+        // profile id so it always matches where `save_credential` stores the
+        // secret and where the connect path reads it back. Other auth kinds are
+        // carried through unchanged.
+        let auth = match self.auth {
+            AuthConfig::Password { .. } => AuthConfig::Password {
+                credential_key: profile_password_key(id),
+            },
+            other => other,
+        };
         ConnectionProfile {
             id,
             name: self.name,
@@ -141,7 +153,7 @@ impl ProfileDraft {
             username: self.username,
             domain: self.domain,
             folder_id: self.folder_id,
-            auth: self.auth,
+            auth,
             protocol_params: self.protocol_params,
             logging_enabled: self.logging_enabled,
             log_path: self.log_path,
@@ -825,6 +837,56 @@ impl<C: CredentialStore> ConnectionManager<C> {
         Ok(())
     }
 
+    /// Store, replace, or clear a profile's password credential in
+    /// Secure_Storage (Requirement 17).
+    ///
+    /// The password is keyed by the profile's own password key (the UI never
+    /// handles the raw credential-key reference). Semantics:
+    ///
+    /// - `Some(pw)` where `pw` is non-empty → save/replace the stored secret.
+    /// - `Some("")` (an explicitly cleared field) → remove the stored secret.
+    /// - `None` (the editor left the field untouched) → no-op; the existing
+    ///   stored secret is preserved unchanged.
+    ///
+    /// On a storage failure the prior stored secret is left unchanged (the
+    /// backend's `save`/`delete` are the only writers and they fail atomically),
+    /// and the error is returned so the editor can keep the entered value and
+    /// surface it (Requirement 17.6). The secret is never written to the
+    /// connection database (Requirement 17.7): it only ever flows to the
+    /// Credential_Store here.
+    pub async fn save_credential(
+        &self,
+        id: ProfileId,
+        password: Option<String>,
+    ) -> Result<(), DomainError> {
+        let key = profile_password_key(id);
+        match password {
+            Some(pw) if !pw.is_empty() => {
+                self.credentials.save(key, Secret::new(pw)).await?;
+            }
+            Some(_) => {
+                // Explicitly cleared: remove any stored credential for the
+                // profile. Idempotent, so clearing an absent secret is fine.
+                self.credentials.delete_for_profile(id).await?;
+            }
+            None => {
+                // Untouched field: preserve whatever is stored.
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether a profile currently has a stored password credential
+    /// (Requirement 17.3). Returns only presence — never the secret itself — so
+    /// the editor can show a "credential stored" indicator without exposing it.
+    pub async fn has_credential(&self, id: ProfileId) -> Result<bool, DomainError> {
+        match self.credentials.get(profile_password_key(id)).await {
+            Ok(_) => Ok(true),
+            Err(crate::domain::CredentialError::NotFound) => Ok(false),
+            Err(other) => Err(other.into()),
+        }
+    }
+
     /// Delete a folder and its entire subtree, requiring confirmation first
     /// (Requirements 3.6, 3.7, 3.8), and remove every contained profile's
     /// stored credentials (consistent with Requirement 11.6).
@@ -1397,6 +1459,87 @@ mod tests {
             .delete_profile(ProfileId::new(), true)
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn save_credential_stores_replaces_clears_and_reports_presence() {
+        // Requirement 17: the save_credential lifecycle over the Credential_Store.
+        let manager = manager();
+        let created = manager.create_profile(valid_draft()).unwrap();
+        let key = profile_password_key(created.id);
+
+        // Initially no credential, and has_credential reflects that.
+        assert!(!manager.has_credential(created.id).await.unwrap());
+
+        // Some(non-empty): stores the secret.
+        manager
+            .save_credential(created.id, Some("hunter2".to_string()))
+            .await
+            .unwrap();
+        assert!(manager.has_credential(created.id).await.unwrap());
+        assert_eq!(
+            manager
+                .credentials()
+                .get(key.clone())
+                .await
+                .unwrap()
+                .expose(),
+            "hunter2"
+        );
+
+        // None: untouched — the stored secret is preserved unchanged.
+        manager.save_credential(created.id, None).await.unwrap();
+        assert_eq!(
+            manager
+                .credentials()
+                .get(key.clone())
+                .await
+                .unwrap()
+                .expose(),
+            "hunter2"
+        );
+
+        // Some(non-empty) again: replaces the secret.
+        manager
+            .save_credential(created.id, Some("s3cret".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(
+            manager
+                .credentials()
+                .get(key.clone())
+                .await
+                .unwrap()
+                .expose(),
+            "s3cret"
+        );
+
+        // Some(""): cleared — the stored credential is removed.
+        manager
+            .save_credential(created.id, Some(String::new()))
+            .await
+            .unwrap();
+        assert!(!manager.has_credential(created.id).await.unwrap());
+        assert!(!manager.credentials().contains(&key));
+    }
+
+    #[tokio::test]
+    async fn password_profile_normalizes_its_credential_key() {
+        // Requirement 17: a saved password profile points at its own canonical
+        // key, regardless of what the draft carried, so save_credential and the
+        // connect path agree on where the secret lives.
+        let manager = manager();
+        let mut draft = valid_draft();
+        draft.auth = AuthConfig::Password {
+            credential_key: CredentialKey::new("whatever/the/ui/sent"),
+        };
+        let created = manager.create_profile(draft).unwrap();
+        match &created.auth {
+            AuthConfig::Password { credential_key } => {
+                assert_eq!(credential_key, &profile_password_key(created.id));
+            }
+            other => panic!("expected password auth, got {other:?}"),
+        }
     }
 
     // --- Folder name validation (task 3.8) ---------------------------------
@@ -2252,7 +2395,18 @@ mod tests {
             prop_assert_eq!(&stored.username, &draft.username);
             prop_assert_eq!(&stored.domain, &draft.domain);
             prop_assert_eq!(stored.folder_id, draft.folder_id);
-            prop_assert_eq!(&stored.auth, &draft.auth);
+            // Auth is carried through faithfully, except that a password
+            // profile's credential key is normalized to the profile's own
+            // canonical key (`profile/{id}/password`) — the UI no longer
+            // submits a raw credential-key reference (Requirement 17). So for
+            // password auth we assert the key is the canonical one; for every
+            // other auth kind we assert exact equality with the draft.
+            match (&draft.auth, &stored.auth) {
+                (AuthConfig::Password { .. }, AuthConfig::Password { credential_key }) => {
+                    prop_assert_eq!(credential_key, &profile_password_key(stored.id));
+                }
+                _ => prop_assert_eq!(&stored.auth, &draft.auth),
+            }
             prop_assert_eq!(&stored.protocol_params, &draft.protocol_params);
             prop_assert_eq!(stored.logging_enabled, draft.logging_enabled);
             prop_assert_eq!(&stored.log_path, &draft.log_path);

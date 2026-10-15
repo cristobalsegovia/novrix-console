@@ -428,6 +428,23 @@ Work proceeds from the foundation outward: scaffold the Tauri workspace and shar
     - Make `upload_file`/`download_file` non-blocking with a per-session in-flight transfer-handle registry so `cancel_transfer` really cancels (≤2 s) and cleans up; wire `run_script` to drive a live session's `SessionConn` through the Session_Manager so scripts execute instead of returning the not-wired error
     - _Requirements: 13.6, 14.2, 14.3_
 
+- [ ] 27. Credential entry, visual polish, and command snippets (Requirements 17, 18, 19)
+  - [ ] 27.1 Add a save_credential IPC command and store entered passwords
+    - Expose a `save_credential(profile_id, password: Option<String>)` Tauri command over the Credential_Store: `Some(non-empty)` saves to Secure_Storage under the profile's password key, `Some("")`/cleared removes the stored credential, `None` leaves it unchanged; add a `has_credential(profile_id)` presence check (never returns the secret); on storage failure retain the entered value and surface the error, leaving the prior stored secret unchanged; never write the secret to SQLite or exports
+    - _Requirements: 17.1, 17.4, 17.5, 17.6, 17.7_
+  - [ ] 27.2 Add a masked password field to the profile editor
+    - In the React profile form, replace the raw "credential key reference" input with a real password field (masked, reveal toggle) shown for password auth; on save call `save_credential`; when editing a profile with a stored credential show a "credential stored" indicator (from `has_credential`) without displaying the secret; wire the TS IPC client
+    - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5_
+  - [ ] 27.3 Polish the visual experience across the shell
+    - Unify the sidebar/editor/session layout and the control/field/dialog styles against the Novrix palette+typography tokens; standardize the dismissible error banner and a uniform async busy state; ensure visible focus indicators and WCAG-AA contrast in both themes; keep the persisted dark/light toggle; add an empty-state guidance panel
+    - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
+  - [ ] 27.4 Implement the Command_Snippet model, persistence, and manager
+    - Add `CommandSnippet`/`SnippetDraft`/`SnippetId` to the domain model; a `snippets` table with a schema migration; a `SnippetManager` (create/update/delete-with-confirmation/list) over the SQLite repository with name/command non-empty validation; unit tests for validation and round-trip persistence
+    - _Requirements: 19.1, 19.2, 19.3, 19.7_
+  - [ ] 27.5 Wire snippet IPC commands and the snippet UI
+    - Add `save_snippet`/`update_snippet`/`delete_snippet`/`list_snippets` Tauri commands on the Connection_Manager actor thread and their TS wrappers; add a snippets panel/affordance in the session area that, for an active text-based session, sends the snippet's command via `send_input` (newline-terminated); offer a protocol-restricted snippet only for matching SSH/Telnet/Serial sessions; show the required-active-session indication when none applies
+    - _Requirements: 19.3, 19.4, 19.5, 19.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for a faster MVP; they are the property-based, unit, integration, smoke, and performance tests.
@@ -455,7 +472,8 @@ Work proceeds from the foundation outward: scaffold the Tauri workspace and shar
     { "id": 11, "tasks": ["23.1"] },
     { "id": 12, "tasks": ["24.1", "24.2"] },
     { "id": 13, "tasks": ["25.1", "25.2", "25.3", "25.4"] },
-    { "id": 14, "tasks": ["26.1", "26.2", "26.3", "26.4", "26.5"] }
+    { "id": 14, "tasks": ["26.1", "26.2", "26.3", "26.4", "26.5"] },
+    { "id": 15, "tasks": ["27.1", "27.2", "27.3", "27.4", "27.5"] }
   ]
 }
 ```

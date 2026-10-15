@@ -1160,6 +1160,38 @@ pub async fn delete_profile(
         .await
 }
 
+/// Store, replace, or clear a profile's password credential (Requirement 17).
+///
+/// `password = Some(non-empty)` saves it to Secure_Storage; `Some("")` clears
+/// the stored credential; `None` leaves it unchanged. The secret only ever
+/// reaches the Credential_Store — never the connection database or an export.
+#[tauri::command]
+pub async fn save_credential(
+    state: State<'_, AppState>,
+    profile_id: ProfileId,
+    password: Option<String>,
+) -> Result<(), DomainError> {
+    state
+        .connection
+        .run_async(move |m| Box::pin(m.save_credential(profile_id, password)))
+        .await
+}
+
+/// Whether a profile has a stored password credential (Requirement 17.3).
+///
+/// Returns presence only — never the secret — so the editor can show a
+/// "credential stored" indicator without exposing it.
+#[tauri::command]
+pub async fn has_credential(
+    state: State<'_, AppState>,
+    profile_id: ProfileId,
+) -> Result<bool, DomainError> {
+    state
+        .connection
+        .run_async(move |m| Box::pin(m.has_credential(profile_id)))
+        .await
+}
+
 /// List every stored profile.
 #[tauri::command]
 pub async fn list_profiles(

@@ -230,6 +230,48 @@ trait ScriptEngine {
 }
 ```
 
+### Credential Entry (Requirement 17)
+
+The Credential_Store already stores/retrieves/deletes secrets by `CredentialKey`; what is missing is a path from the UI to it. The design adds a thin IPC command `save_credential(profile_id, password: Option<String>)` that the profile editor calls on save:
+
+- `Some(pw)` with a non-empty value → `CredentialStore::save(profile_password_key(profile_id), pw)`.
+- `Some("")` / cleared field on a profile that had a credential → `delete_for_profile`-style removal of that profile's password key.
+- `None` (field untouched in the editor) → no-op, preserving the existing stored credential.
+
+The editor derives the profile's `AuthConfig::Password { credential_key }` from the profile id (via `profile_password_key`), so the user never types a raw credential-key reference — the reference is an implementation detail. The password field is masked with a reveal toggle, and on an existing profile the editor shows a "credential stored" indicator sourced from a boolean `has_credential` (a presence check, never the secret). A storage failure keeps the entered value in the editor and surfaces the error, leaving the prior stored secret unchanged (Requirement 17.6). No entered secret is ever written to SQLite or an export (Requirement 17.7, already guaranteed by the persistence layer, which stores only credential *references*).
+
+### Visual Experience (Requirement 18)
+
+A presentation-layer concern, not a core-logic one: the Rust components are unchanged. The React shell is refined against the existing Novrix palette/typography tokens already in `styles.css`:
+
+- One consistent layout grid for sidebar / editor / session area; shared control, field, and dialog styles.
+- Dark/light themes persisted in `localStorage` (already present) with WCAG-AA contrast enforced by the token set in both themes (the brand cyan stays navy-only; the light theme uses `#0E7490`).
+- A uniform busy state (spinner/disabled controls) for async commands, a dismissible, visually-distinct error banner (already present, standardized), visible focus rings, and an empty-state panel with next-step guidance.
+
+No new IPC surface is required; this requirement is satisfied by component/stylesheet work and verified by review against the acceptance criteria (contrast, focus, persistence, busy/error states).
+
+### Command Snippets (Requirement 19)
+
+A new, small persisted entity managed alongside profiles/folders in the same SQLite database (never Secure_Storage). A `SnippetManager` mirrors the Connection_Manager's CRUD shape:
+
+```rust
+struct CommandSnippet {
+    id: SnippetId,                       // stable UUID
+    name: String,                        // non-empty
+    command: String,                     // non-empty; sent verbatim
+    protocol: Option<ProtocolKind>,      // None = any text-based protocol
+}
+
+trait SnippetManager {
+    fn create(&self, draft: SnippetDraft) -> Result<CommandSnippet, DomainError>;
+    fn update(&self, id: SnippetId, draft: SnippetDraft) -> Result<CommandSnippet, DomainError>;
+    fn delete(&self, id: SnippetId, confirmed: bool) -> Result<(), DomainError>;
+    fn list(&self) -> Result<Vec<CommandSnippet>, DomainError>;
+}
+```
+
+IPC commands (`save_snippet` / `update_snippet` / `delete_snippet` / `list_snippets`) run on the Connection_Manager actor thread (same `rusqlite` connection, same serialization model). Sending a snippet reuses the existing `send_input(session, bytes)` command — the frontend sends the snippet's `command` (newline-terminated) to the active text-based session. RDP sessions are graphical and offer no send path, so the snippet affordance is shown only for SSH/Telnet/Serial sessions, and a snippet restricted to a protocol is offered only for matching sessions (Requirement 19.5, 19.6). Validation rejects an empty name or command before any write (Requirement 19.2); deletion is confirmed (Requirement 19.3).
+
 ## Data Models
 
 ```rust
@@ -632,6 +674,24 @@ The properties below were derived from the acceptance criteria through the prewo
 *For any* successful import, the reported number of folders and profiles added equals the actual number added.
 
 **Validates: Requirements 16.5**
+
+### Property 56: Entered credential is stored and never persisted in plaintext
+
+*For any* Connection_Profile saved with an entered password, the password is written to Secure_Storage and never appears in the connection database or any export file; clearing the field on a profile that had a stored credential removes it, and leaving the field untouched preserves the existing stored credential.
+
+**Validates: Requirements 17.1, 17.4, 17.5, 17.7**
+
+### Property 57: Snippet validity
+
+*For any* Command_Snippet submission, it is saved if and only if it has a non-empty name and non-empty command text; otherwise it is rejected with a validation message identifying the missing field, and nothing is stored.
+
+**Validates: Requirements 19.1, 19.2**
+
+### Property 58: Snippet send targets only an active text-based session of a permitted protocol
+
+*For any* snippet invocation, the command text is sent if and only if there is an active text-based Session whose protocol the snippet permits; otherwise no send occurs and the required-active-session indication is produced.
+
+**Validates: Requirements 19.4, 19.5, 19.6**
 
 ## Error Handling
 

@@ -319,6 +319,28 @@ export function deleteProfile(
   return invoke("delete_profile", { id, confirmed });
 }
 
+/**
+ * Store, replace, or clear a profile's password credential (Requirement 17).
+ * `password` as a non-empty string saves it to OS secure storage; the empty
+ * string clears the stored credential; `null` leaves it unchanged. The secret
+ * only ever reaches the Credential_Store, never the connection database.
+ */
+export function saveCredential(
+  profileId: ProfileId,
+  password: string | null,
+): Promise<void> {
+  return invoke("save_credential", { profileId, password });
+}
+
+/**
+ * Whether a profile has a stored password credential (Requirement 17.3).
+ * Returns presence only, never the secret, so the editor can show a
+ * "credential stored" indicator.
+ */
+export function hasCredential(profileId: ProfileId): Promise<boolean> {
+  return invoke("has_credential", { profileId });
+}
+
 // Folders
 export function listFolders(): Promise<Folder[]> {
   return invoke("list_folders");
