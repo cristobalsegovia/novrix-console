@@ -1,81 +1,191 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { ChevronDown, ChevronRight, RefreshCw, X } from "lucide-react";
 import type {
+  AuthMethod,
   GroupNode,
+  Identity,
   Protocol,
   RdpConfig,
   SavedSession,
+  SerialConfig,
   SessionDraft,
   SshConfig,
 } from "../types";
 
 interface Props {
   groups: GroupNode[];
+  identities: Identity[];
   rdpAvailable: boolean;
   initial?: SavedSession | null;
   presetGroupId?: string | null;
   onCancel: () => void;
   onConnectSsh: (config: SshConfig) => void;
   onConnectRdp: (config: RdpConfig) => void;
-  onSave: (draft: SessionDraft, connectAfter: boolean, newGroupName?: string) => void;
+  onConnectSerial: (config: SerialConfig) => void;
+  onSave: (
+    draft: SessionDraft,
+    connectAfter: boolean,
+    newGroupName?: string,
+  ) => void;
   onInstallHint: () => void;
+  onManageIdentities: () => void;
 }
 
 const NEW_GROUP = "__new__";
 
+function flattenSshSessions(
+  nodes: GroupNode[],
+  prefix = "",
+): { id: string; label: string }[] {
+  return nodes.flatMap((g) => {
+    const path = prefix ? `${prefix} › ${g.name}` : g.name;
+    return [
+      ...g.sessions
+        .filter((s) => s.protocol === "ssh")
+        .map((s) => ({
+          id: s.id,
+          label: `${path} › ${s.name} (${s.host})`,
+        })),
+      ...flattenSshSessions(g.children, path),
+    ];
+  });
+}
+
+function flattenGroupOptions(
+  nodes: GroupNode[],
+  prefix = "",
+): { id: string; label: string }[] {
+  return nodes.flatMap((g) => {
+    const label = prefix ? `${prefix} › ${g.name}` : g.name;
+    return [
+      { id: g.id, label },
+      ...flattenGroupOptions(g.children, label),
+    ];
+  });
+}
+
 export default function SshDialog({
   groups,
+  identities,
   rdpAvailable,
   initial,
   presetGroupId,
   onCancel,
   onConnectSsh,
   onConnectRdp,
+  onConnectSerial,
   onSave,
   onInstallHint,
+  onManageIdentities,
 }: Props) {
   const editing = Boolean(initial);
-  const [protocol, setProtocol] = useState<Protocol>(initial?.protocol ?? "ssh");
+  const [protocol, setProtocol] = useState<Protocol>(
+    initial?.protocol ?? "ssh",
+  );
   const [name, setName] = useState(initial?.name ?? "");
   const [host, setHost] = useState(initial?.host ?? "");
   const [port, setPort] = useState(
     String(initial?.port ?? (initial?.protocol === "rdp" ? 3389 : 22)),
   );
-  const [username, setUsername] = useState(initial?.username ?? "");
-  const [domain, setDomain] = useState(initial?.domain ?? "");
-  const [authMode, setAuthMode] = useState<"password" | "key">(
+  const [username, setUsername] = useState(initial?.username ?? "root");
+  const domain = initial?.domain ?? "";
+  const [authMode, setAuthMode] = useState<AuthMethod>(
     initial?.authMethod ?? "password",
   );
   const [password, setPassword] = useState("");
-  const [keyPath, setKeyPath] = useState(initial?.keyPath ?? "~/.ssh/id_ed25519");
-  const [keyPassphrase, setKeyPassphrase] = useState("");
-  const [resolution, setResolution] = useState(initial?.rdpResolution ?? "fit");
-  const [save, setSave] = useState(editing || Boolean(presetGroupId));
-  const [groupId, setGroupId] = useState(
-    initial?.groupId ?? presetGroupId ?? groups[0]?.id ?? NEW_GROUP,
+  const [keyPath, setKeyPath] = useState(
+    initial?.keyPath ?? "~/.ssh/id_ed25519",
   );
-  const [newGroupName, setNewGroupName] = useState("");
+  const [keyPassphrase, setKeyPassphrase] = useState("");
+  const [identityId, setIdentityId] = useState(
+    initial?.identityId ?? identities[0]?.id ?? "",
+  );
+  const [jumpSessionId, setJumpSessionId] = useState(
+    initial?.jumpSessionId ?? "",
+  );
+  const [legacyCrypto, setLegacyCrypto] = useState(
+    initial?.legacyCrypto ?? false,
+  );
+  const [showAdvanced, setShowAdvanced] = useState(
+    Boolean(initial?.jumpSessionId || initial?.legacyCrypto),
+  );
+
+  // Serial state
+  const [serialPorts, setSerialPorts] = useState<string[]>([]);
+  const [serialPort, setSerialPort] = useState(
+    initial?.serialPort ?? initial?.host ?? "",
+  );
+  const [baudRate, setBaudRate] = useState(
+    String(initial?.baudRate ?? 115200),
+  );
+
+  const flatGroups = useMemo(() => flattenGroupOptions(groups), [groups]);
+  const [save, setSave] = useState(true);
+  const [groupId, setGroupId] = useState(
+    initial?.groupId ?? presetGroupId ?? flatGroups[0]?.id ?? NEW_GROUP,
+  );
+  const [newGroupName, setNewGroupName] = useState(
+    flatGroups.length === 0 ? "General" : "",
+  );
 
   const isRdp = protocol === "rdp";
+  const isSerial = protocol === "serial";
+  const isSsh = protocol === "ssh";
+
+  const sshSessions = useMemo(
+    () => flattenSshSessions(groups).filter((s) => s.id !== initial?.id),
+    [groups, initial?.id],
+  );
+
+  const refreshSerialPorts = () => {
+    invoke<string[]>("list_serial_ports")
+      .then((ports) => {
+        setSerialPorts(ports);
+        if (!serialPort && ports.length > 0) {
+          setSerialPort(ports[0]);
+        }
+      })
+      .catch(() => setSerialPorts([]));
+  };
+
+  useEffect(() => {
+    if (isSerial) {
+      refreshSerialPorts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSerial]);
 
   const switchProtocol = (p: Protocol) => {
     setProtocol(p);
-    // Keep the default port sensible when the user hasn't overridden it.
     if (p === "rdp" && (port === "22" || port === "")) setPort("3389");
     if (p === "ssh" && (port === "3389" || port === "")) setPort("22");
   };
 
-  const ready =
-    host.trim() !== "" &&
-    username.trim() !== "" &&
-    (!save || groupId !== NEW_GROUP || newGroupName.trim() !== "");
+  const selectedIdentity = identities.find((i) => i.id === identityId);
+  const effectiveUsername =
+    authMode === "identity" && selectedIdentity
+      ? selectedIdentity.username
+      : username.trim();
+
+  const ready = isSerial
+    ? serialPort.trim() !== "" &&
+      (!save || groupId !== NEW_GROUP || newGroupName.trim() !== "")
+    : host.trim() !== "" &&
+      (authMode === "identity" || effectiveUsername !== "") &&
+      (!save || groupId !== NEW_GROUP || newGroupName.trim() !== "");
 
   const buildSsh = (): SshConfig => {
     const config: SshConfig = {
       host: host.trim(),
       port: Number(port) || 22,
-      username: username.trim(),
+      username: effectiveUsername || "root",
+      jumpSessionId: jumpSessionId || undefined,
+      legacyCrypto,
     };
-    if (authMode === "password") {
+    if (authMode === "identity") {
+      config.identityId = identityId || undefined;
+    } else if (authMode === "password") {
       if (password) config.password = password;
     } else {
       config.keyPath = keyPath.trim();
@@ -87,65 +197,108 @@ export default function SshDialog({
   const buildRdp = (): RdpConfig => ({
     host: host.trim(),
     port: Number(port) || 3389,
-    username: username.trim(),
+    username: effectiveUsername,
     domain: domain.trim() || undefined,
     password: password || undefined,
-    resolution,
+    resolution: "fit",
     clipboard: true,
+  });
+
+  const buildSerial = (): SerialConfig => ({
+    portName: serialPort.trim(),
+    baudRate: Number(baudRate) || 115200,
   });
 
   const buildDraft = (): SessionDraft => ({
     id: initial?.id,
     groupId: groupId === NEW_GROUP ? "" : groupId,
-    name: name.trim() || `${username.trim()}@${host.trim()}`,
-    host: host.trim(),
+    name:
+      name.trim() ||
+      (isSerial
+        ? `${serialPort.trim().replace("/dev/", "")}`
+        : host.trim()),
+    host: isSerial ? serialPort.trim() : host.trim(),
     port: Number(port) || (isRdp ? 3389 : 22),
-    username: username.trim(),
-    authMethod: isRdp ? "password" : authMode,
-    keyPath: !isRdp && authMode === "key" ? keyPath.trim() : undefined,
+    username: isSerial ? "serial" : effectiveUsername || "root",
+    authMethod: isSerial ? "password" : authMode,
+    keyPath: isSsh && authMode === "key" ? keyPath.trim() : undefined,
     protocol,
     domain: isRdp ? domain.trim() || undefined : undefined,
-    rdpResolution: isRdp ? resolution : undefined,
+    rdpResolution: isRdp ? "fit" : undefined,
+    identityId: authMode === "identity" ? identityId || undefined : undefined,
+    jumpSessionId: isSsh && jumpSessionId ? jumpSessionId : undefined,
+    legacyCrypto: isSsh ? legacyCrypto : false,
+    serialPort: isSerial ? serialPort.trim() : undefined,
+    baudRate: isSerial ? Number(baudRate) || 115200 : undefined,
     password:
-      (isRdp || authMode === "password") && password ? password : undefined,
+      !isSerial && authMode === "password" && password ? password : undefined,
     keyPassphrase:
-      !isRdp && authMode === "key" && keyPassphrase ? keyPassphrase : undefined,
+      isSsh && authMode === "key" && keyPassphrase ? keyPassphrase : undefined,
   });
 
-  const submit = (connectAfter: boolean) => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!ready) return;
-    if (connectAfter && isRdp && !rdpAvailable) {
+    if (!editing && isRdp && !rdpAvailable) {
       onInstallHint();
       return;
     }
-    if (save || editing) {
+    if (editing) {
       onSave(
         buildDraft(),
-        connectAfter,
+        false,
+        groupId === NEW_GROUP ? newGroupName.trim() : undefined,
+      );
+    } else if (save) {
+      onSave(
+        buildDraft(),
+        true,
         groupId === NEW_GROUP ? newGroupName.trim() : undefined,
       );
     } else if (isRdp) {
       onConnectRdp(buildRdp());
+    } else if (isSerial) {
+      onConnectSerial(buildSerial());
     } else {
       onConnectSsh(buildSsh());
     }
   };
 
   return (
-    <div className="dialog-backdrop" onMouseDown={onCancel}>
-      <div className="dialog" onMouseDown={(e) => e.stopPropagation()}>
-        <header className="dialog-title">
-          {editing ? "Edit session" : "New connection"}
+    <div className="backdrop" onMouseDown={onCancel}>
+      <form
+        className="dialog"
+        style={{ width: 480 }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+      >
+        <header className="dialog-head">
+          <h2>{editing ? "Editar conexión" : "Nueva conexión"}</h2>
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={onCancel}
+            aria-label="Cerrar"
+          >
+            <X size={15} />
+          </button>
         </header>
 
-        {!editing && (
-          <div className="proto-toggle" role="radiogroup" aria-label="Protocol">
+        <div className="dialog-body">
+          <div className="seg" role="radiogroup" aria-label="Protocolo">
             <button
               type="button"
-              className={!isRdp ? "on" : ""}
+              className={isSsh ? "on" : ""}
               onClick={() => switchProtocol("ssh")}
             >
               SSH
+            </button>
+            <button
+              type="button"
+              className={isSerial ? "on" : ""}
+              onClick={() => switchProtocol("serial")}
+            >
+              Consola Serial
             </button>
             <button
               type="button"
@@ -155,204 +308,304 @@ export default function SshDialog({
               RDP
             </button>
           </div>
-        )}
 
-        {isRdp && !rdpAvailable && (
-          <div className="inline-warn">
-            FreeRDP isn't installed. Install it, then reconnect:
-            <code>brew install freerdp</code>
-            <button className="btn ghost sm" onClick={onInstallHint}>
-              Copy command
-            </button>
-          </div>
-        )}
-
-        <div className="field-row">
-          <label className="field grow">
-            <span>Host</span>
-            <input
-              autoFocus={!editing}
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              placeholder={isRdp ? "10.0.0.5 or dc01.corp" : "192.168.1.10 or nx-core-01.lab"}
-            />
-          </label>
-          <label className="field port">
-            <span>Port</span>
-            <input
-              value={port}
-              onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
-            />
-          </label>
-        </div>
-
-        <div className="field-row">
-          <label className="field grow">
-            <span>Username</span>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={isRdp ? "administrator" : "admin"}
-            />
-          </label>
-          {isRdp && (
-            <label className="field grow">
-              <span>Domain (optional)</span>
-              <input
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                placeholder="CORP"
-              />
-            </label>
-          )}
-        </div>
-
-        {!isRdp && (
-          <div className="auth-toggle" role="radiogroup" aria-label="Authentication">
-            <button
-              type="button"
-              className={authMode === "password" ? "on" : ""}
-              onClick={() => setAuthMode("password")}
-            >
-              Password
-            </button>
-            <button
-              type="button"
-              className={authMode === "key" ? "on" : ""}
-              onClick={() => setAuthMode("key")}
-            >
-              Private key
-            </button>
-          </div>
-        )}
-
-        {isRdp || authMode === "password" ? (
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={editing ? "Unchanged — type to replace" : ""}
-            />
-          </label>
-        ) : (
-          <>
-            <label className="field">
-              <span>Key file</span>
-              <input
-                value={keyPath}
-                onChange={(e) => setKeyPath(e.target.value)}
-                placeholder="~/.ssh/id_ed25519"
-              />
-            </label>
-            <label className="field">
-              <span>Passphrase (optional)</span>
-              <input
-                type="password"
-                value={keyPassphrase}
-                onChange={(e) => setKeyPassphrase(e.target.value)}
-                placeholder={editing ? "Unchanged — type to replace" : ""}
-              />
-            </label>
-          </>
-        )}
-
-        {isRdp && (
-          <label className="field">
-            <span>Display</span>
-            <select value={resolution} onChange={(e) => setResolution(e.target.value)}>
-              <option value="fit">Fit window (dynamic)</option>
-              <option value="1920x1080">1920 × 1080</option>
-              <option value="1600x900">1600 × 900</option>
-              <option value="1440x900">1440 × 900</option>
-              <option value="1280x800">1280 × 800</option>
-            </select>
-          </label>
-        )}
-
-        {!editing && (
-          <label className="save-toggle">
-            <input
-              type="checkbox"
-              checked={save}
-              onChange={(e) => setSave(e.target.checked)}
-            />
-            <span>Save to sidebar (password goes to the macOS Keychain)</span>
-          </label>
-        )}
-
-        {(save || editing) && (
-          <>
-            <div className="field-row">
-              <label className="field grow">
-                <span>Session name</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={`${username || "user"}@${host || "host"}`}
-                />
+          {isSerial ? (
+            <div className="row-split">
+              <label>
+                <span>Puerto USB-Serial</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    style={{ flex: 1 }}
+                    autoFocus={!editing}
+                    list="serial-ports-list"
+                    value={serialPort}
+                    onChange={(e) => setSerialPort(e.target.value)}
+                    placeholder="/dev/cu.usbserial-1410"
+                  />
+                  <datalist id="serial-ports-list">
+                    {serialPorts.map((p) => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    title="Actualizar puertos USB"
+                    onClick={refreshSerialPorts}
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </div>
               </label>
-              <label className="field grow">
-                <span>Group</span>
-                <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                  <option value={NEW_GROUP}>+ New group…</option>
+              <label>
+                <span>Velocidad (Baud)</span>
+                <select
+                  value={baudRate}
+                  onChange={(e) => setBaudRate(e.target.value)}
+                >
+                  <option value="9600">9600 (Cisco)</option>
+                  <option value="19200">19200</option>
+                  <option value="38400">38400</option>
+                  <option value="57600">57600</option>
+                  <option value="115200">115200</option>
                 </select>
               </label>
             </div>
-            {groupId === NEW_GROUP && (
-              <label className="field">
-                <span>New group name</span>
+          ) : (
+            <>
+              <div className="row-split">
+                <label>
+                  <span>Host o dirección IP</span>
+                  <input
+                    autoFocus={!editing}
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    placeholder="10.0.0.10 o nvx-01.local"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  />
+                </label>
+                <label>
+                  <span>Puerto</span>
+                  <input
+                    value={port}
+                    onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  />
+                </label>
+              </div>
+
+              <label>
+                <span>Autenticación</span>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={authMode === "password" ? "on" : ""}
+                    onClick={() => setAuthMode("password")}
+                  >
+                    Contraseña
+                  </button>
+                  {isSsh && (
+                    <button
+                      type="button"
+                      className={authMode === "key" ? "on" : ""}
+                      onClick={() => setAuthMode("key")}
+                    >
+                      Clave SSH
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={authMode === "identity" ? "on" : ""}
+                    onClick={() => setAuthMode("identity")}
+                  >
+                    Bóveda
+                  </button>
+                </div>
+              </label>
+
+              {authMode === "identity" ? (
+                <div
+                  style={{ display: "flex", gap: 8, alignItems: "flex-end" }}
+                >
+                  <label style={{ flex: 1 }}>
+                    <span>Identidad de la bóveda</span>
+                    <select
+                      value={identityId}
+                      onChange={(e) => setIdentityId(e.target.value)}
+                    >
+                      <option value="">(Heredar del grupo)</option>
+                      {identities.map((ident) => (
+                        <option key={ident.id} value={ident.id}>
+                          {ident.name} ({ident.username})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={onManageIdentities}
+                  >
+                    Editar bóveda…
+                  </button>
+                </div>
+              ) : (
+                <div className="row-split" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  <label>
+                    <span>Usuario</span>
+                    <input
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="root"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    />
+                  </label>
+                  {authMode === "password" ? (
+                    <label>
+                      <span>Contraseña</span>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder={editing ? "Sin cambios" : "••••••••"}
+                      />
+                    </label>
+                  ) : (
+                    <label>
+                      <span>Archivo de clave privada</span>
+                      <input
+                        value={keyPath}
+                        onChange={(e) => setKeyPath(e.target.value)}
+                        placeholder="~/.ssh/id_ed25519"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Guardar en grupo + Nombre en una sola fila limpia */}
+          <div className="row-split" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <label>
+              <span>Nombre visible (opcional)</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={host.trim() || "ej. nvx-core-01"}
+              />
+            </label>
+            <label>
+              <span>Grupo</span>
+              {groupId === NEW_GROUP ? (
                 <input
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="Client, site, lab…"
+                  placeholder="Nombre del grupo…"
                 />
-              </label>
-            )}
-          </>
-        )}
+              ) : (
+                <select
+                  value={groupId}
+                  onChange={(e) => setGroupId(e.target.value)}
+                >
+                  {flatGroups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                    </option>
+                  ))}
+                  <option value={NEW_GROUP}>+ Crear nuevo grupo…</option>
+                </select>
+              )}
+            </label>
+          </div>
 
-        <footer className="dialog-actions">
-          <button type="button" className="btn ghost" onClick={onCancel}>
-            Cancel
-          </button>
-          {save || editing ? (
-            <>
+          {/* Opciones avanzadas colapsadas para no saturar */}
+          {isSsh && (
+            <div>
               <button
                 type="button"
-                className="btn ghost"
-                disabled={!ready}
-                onClick={() => submit(false)}
+                onClick={() => setShowAdvanced((v) => !v)}
+                style={{
+                  border: 0,
+                  background: "none",
+                  color: "var(--ink-muted)",
+                  font: "inherit",
+                  fontSize: 12,
+                  padding: "2px 0",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
               >
-                Save
+                {showAdvanced ? (
+                  <ChevronDown size={13} />
+                ) : (
+                  <ChevronRight size={13} />
+                )}
+                Opciones avanzadas (Salto Bastión, equipos antiguos, passphrase)
               </button>
-              <button
-                type="button"
-                className="btn accent"
-                disabled={!ready}
-                onClick={() => submit(true)}
-              >
-                Save &amp; connect
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn accent"
-              disabled={!ready}
-              onClick={() => submit(true)}
-            >
-              Connect
-            </button>
+
+              {showAdvanced && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 10,
+                    borderRadius: 6,
+                    background: "var(--surface-sunken)",
+                    border: "1px solid var(--border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  {authMode === "key" && (
+                    <label>
+                      <span>Passphrase de la clave (opcional)</span>
+                      <input
+                        type="password"
+                        value={keyPassphrase}
+                        onChange={(e) => setKeyPassphrase(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  <label>
+                    <span>Host de salto (ProxyJump / Bastión)</span>
+                    <select
+                      value={jumpSessionId}
+                      onChange={(e) => setJumpSessionId(e.target.value)}
+                    >
+                      <option value="">Conexión directa (sin bastión)</option>
+                      {sshSessions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={legacyCrypto}
+                      onChange={(e) => setLegacyCrypto(e.target.checked)}
+                    />
+                    <span style={{ fontWeight: 400, fontSize: 12.5 }}>
+                      Cifrado compatible con switches/routers antiguos (diffie-hellman-group14-sha1)
+                    </span>
+                  </label>
+                  {!editing && (
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={save}
+                        onChange={(e) => setSave(e.target.checked)}
+                      />
+                      <span style={{ fontWeight: 400, fontSize: 12.5 }}>
+                        Guardar sesión en el árbol de infraestructura
+                      </span>
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
           )}
+        </div>
+
+        <footer className="dialog-foot">
+          <div className="spacer" />
+          <button type="button" className="btn ghost" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn accent" disabled={!ready}>
+            {editing
+              ? "Guardar cambios"
+              : save
+                ? "Guardar y conectar"
+                : "Conectar"}
+          </button>
         </footer>
-      </div>
+      </form>
     </div>
   );
 }

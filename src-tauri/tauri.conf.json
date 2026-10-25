@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Switchboard Term",
-  "version": "0.6.0",
+  "productName": "Novrix Console",
+  "version": "0.7.0",
   "identifier": "com.kingfisherit.switchboardterm",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -12,17 +12,17 @@
   "app": {
     "windows": [
       {
-        "title": "Switchboard Term",
-        "width": 1200,
-        "height": 780,
-        "minWidth": 820,
-        "minHeight": 520,
+        "title": "Novrix Console",
+        "width": 1240,
+        "height": 800,
+        "minWidth": 860,
+        "minHeight": 540,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {
@@ -35,6 +35,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "entitlements": "./Entitlements.plist",
+      "signingIdentity": "Developer ID Application: Cristobal Segovia (SPKP4JVJ77)",
+      "providerShortName": "SPKP4JVJ77"
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, HelpCircle, Pencil, Plus, Send, Trash2, X, Zap } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import type { Snippet } from "../types";
 
 interface Props {
@@ -10,6 +10,17 @@ interface Props {
   onSend: (command: string) => void;
   onSave: (input: { id?: string; name: string; command: string }) => void;
   onDelete: (id: string) => void;
+  onClose?: () => void;
+}
+
+function extractVariables(cmd: string): string[] {
+  const vars: string[] = [];
+  const re = /\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(cmd)) !== null) {
+    if (!vars.includes(m[1])) vars.push(m[1]);
+  }
+  return vars;
 }
 
 export default function SnippetBar({
@@ -20,11 +31,16 @@ export default function SnippetBar({
   onSend,
   onSave,
   onDelete,
+  onClose,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftCmd, setDraftCmd] = useState("");
+
+  const [paramSnippet, setParamSnippet] = useState<Snippet | null>(null);
+  const [paramVars, setParamVars] = useState<string[]>([]);
+  const [paramValues, setParamValues] = useState<Record<string, string>>({});
 
   const openNew = () => {
     setDraftId(null);
@@ -40,7 +56,8 @@ export default function SnippetBar({
     setEditing(true);
   };
 
-  const save = () => {
+  const save = (e?: React.FormEvent) => {
+    e?.preventDefault();
     const name = draftName.trim();
     const command = draftCmd.trim();
     if (!name || !command) return;
@@ -48,116 +65,235 @@ export default function SnippetBar({
     setEditing(false);
   };
 
+  const handleTrigger = (s: Snippet) => {
+    const vars = extractVariables(s.command);
+    if (vars.length === 0) {
+      onSend(s.command);
+      return;
+    }
+    const initial: Record<string, string> = {};
+    for (const v of vars) initial[v] = "";
+    setParamSnippet(s);
+    setParamVars(vars);
+    setParamValues(initial);
+  };
+
+  const submitParams = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!paramSnippet) return;
+    let resolved = paramSnippet.command;
+    for (const v of paramVars) {
+      const val = paramValues[v] ?? "";
+      resolved = resolved.replace(
+        new RegExp(`\\{\\{\\s*${v}\\s*\\}\\}`, "g"),
+        val,
+      );
+    }
+    setParamSnippet(null);
+    onSend(resolved);
+  };
+
   return (
-    <div className="snippetbar">
+    <div className="snippets" role="toolbar" aria-label="Snippets de comandos">
+      <span className="snippets-label">Snippets</span>
+
       <button
-        className={`btn-icon run-toggle ${runMode ? "on" : ""}`}
+        type="button"
+        className={`snippet-run ${runMode ? "on" : ""}`}
         title={
           runMode
-            ? "Run mode: click sends the command with Enter"
-            : "Insert mode: click types the command without running it"
+            ? "Modo Ejecutar: envía el comando con Enter"
+            : "Modo Insertar: pega el comando sin ejecutarlo"
         }
         onClick={onToggleRun}
       >
-        <Zap size={14} />
-        <span className="run-label">{runMode ? "Run" : "Insert"}</span>
+        {runMode ? "Ejecutar ↵" : "Insertar"}
       </button>
 
-      <div className="snippet-scroll">
+      <span className="snippets-sep" aria-hidden="true" />
+
+      <div className="snippets-list">
         {snippets.length === 0 && (
-          <span className="snippet-empty">No snippets yet — add one →</span>
+          <span className="snippets-empty">Sin comandos guardados</span>
         )}
         {snippets.map((s) => (
-          <span key={s.id} className="snippet-chip">
+          <span
+            key={s.id}
+            className="snippet-chip"
+            onContextMenu={(e) => {
+              e.preventDefault();
+              openEdit(s);
+            }}
+          >
             <button
-              className="snippet-run"
+              type="button"
+              className="snippet-send"
               disabled={!hasActiveSession}
-              title={hasActiveSession ? s.command : "Open a session first"}
-              onClick={() => onSend(s.command)}
+              title={`${s.command} · Clic derecho para editar`}
+              onClick={() => handleTrigger(s)}
             >
-              {runMode ? <Send size={11} /> : null}
               {s.name}
             </button>
             <button
-              className="snippet-edit"
-              title="Edit snippet"
+              type="button"
+              className="snippet-Action"
+              aria-label={`Editar ${s.name}`}
+              title="Editar snippet"
               onClick={() => openEdit(s)}
             >
-              <Pencil size={11} />
+              <Pencil size={11} strokeWidth={1.5} />
             </button>
           </span>
         ))}
       </div>
 
-      <button className="btn-icon" title="New snippet" onClick={openNew}>
-        <Plus size={15} />
+      <button type="button" className="snippet-add" onClick={openNew}>
+        Nuevo snippet
       </button>
 
-      <button
-        className="btn-icon"
-        title={
-          "Copy / paste:\n" +
-          "  ⌘C copy · ⌘V paste · right-click copies or pastes\n" +
-          "  Long URLs copy in full (wrapped lines are rejoined)\n" +
-          "  ⌘-click a URL to open it in your browser\n" +
-          "  In Claude Code / vim: hold ⌥ (Option) and drag to select"
-        }
-        onClick={() => undefined}
-        aria-label="Copy and paste help"
-      >
-        <HelpCircle size={15} />
-      </button>
+      {onClose && (
+        <button
+          type="button"
+          className="btn-icon"
+          aria-label="Cerrar barra de snippets"
+          title="Ocultar barra"
+          onClick={onClose}
+        >
+          <X size={14} strokeWidth={1.5} />
+        </button>
+      )}
+
+      {paramSnippet && (
+        <div className="backdrop" onMouseDown={() => setParamSnippet(null)}>
+          <form
+            className="dialog"
+            style={{ width: 420 }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onSubmit={submitParams}
+          >
+            <header className="dialog-head">
+              <h2>{paramSnippet.name}</h2>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setParamSnippet(null)}
+                aria-label="Cerrar"
+              >
+                <X size={14} strokeWidth={1.5} />
+              </button>
+            </header>
+            <div className="dialog-body">
+              <code className="snippet-cmd-preview">
+                {paramSnippet.command}
+              </code>
+              {paramVars.map((v, idx) => (
+                <label key={v}>
+                  <span>{v}</span>
+                  <input
+                    autoFocus={idx === 0}
+                    value={paramValues[v] ?? ""}
+                    onChange={(e) =>
+                      setParamValues((prev) => ({
+                        ...prev,
+                        [v]: e.target.value,
+                      }))
+                    }
+                    placeholder={`Valor para ${v}`}
+                    className="mono-input"
+                  />
+                </label>
+              ))}
+            </div>
+            <footer className="dialog-foot">
+              <div className="spacer" />
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setParamSnippet(null)}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn accent">
+                {runMode ? "Ejecutar comando" : "Insertar comando"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
 
       {editing && (
-        <div className="snippet-editor-backdrop" onMouseDown={() => setEditing(false)}>
-          <div className="snippet-editor" onMouseDown={(e) => e.stopPropagation()}>
-            <header className="dialog-title">
-              {draftId ? "Edit snippet" : "New snippet"}
+        <div className="backdrop" onMouseDown={() => setEditing(false)}>
+          <form
+            className="dialog"
+            style={{ width: 460 }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onSubmit={save}
+          >
+            <header className="dialog-head">
+              <h2>{draftId ? "Editar snippet" : "Nuevo snippet"}</h2>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setEditing(false)}
+                aria-label="Cerrar"
+              >
+                <X size={14} strokeWidth={1.5} />
+              </button>
             </header>
-            <label className="field">
-              <span>Label (shown on the button)</span>
-              <input
-                autoFocus
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                placeholder="show run"
-                onKeyDown={(e) => e.key === "Enter" && save()}
-              />
-            </label>
-            <label className="field">
-              <span>Command to send</span>
-              <textarea
-                value={draftCmd}
-                onChange={(e) => setDraftCmd(e.target.value)}
-                placeholder="show running-config"
-                rows={3}
-              />
-            </label>
-            <footer className="dialog-actions">
+            <div className="dialog-body">
+              <label>
+                <span>Nombre</span>
+                <input
+                  autoFocus
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  placeholder="por ejemplo, show int status"
+                />
+              </label>
+              <label>
+                <span>Comando</span>
+                <textarea
+                  value={draftCmd}
+                  onChange={(e) => setDraftCmd(e.target.value)}
+                  placeholder="show interface {{interfaz}} status"
+                  rows={3}
+                />
+                <span className="field-help">
+                  Usa <code className="mono-inline">{"{{variable}}"}</code> si
+                  necesitas pedir un valor antes de enviarlo.
+                </span>
+              </label>
+            </div>
+            <footer className="dialog-foot">
               {draftId && (
                 <button
-                  className="btn ghost danger-text"
+                  type="button"
+                  className="btn danger"
                   onClick={() => {
                     onDelete(draftId);
                     setEditing(false);
                   }}
                 >
-                  <Trash2 size={13} /> Delete
+                  Eliminar snippet
                 </button>
               )}
-              <span className="spacer" />
-              <button className="btn ghost" onClick={() => setEditing(false)}>
-                <X size={13} /> Cancel
+              <div className="spacer" />
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setEditing(false)}
+              >
+                Cancelar
               </button>
               <button
+                type="submit"
                 className="btn accent"
                 disabled={!draftName.trim() || !draftCmd.trim()}
-                onClick={save}
               >
-                <Check size={13} /> Save
+                Guardar snippet
               </button>
             </footer>
-          </div>
+          </form>
         </div>
       )}
     </div>

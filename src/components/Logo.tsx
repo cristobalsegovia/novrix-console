@@ -1,39 +1,49 @@
 /**
- * Switchboard mark — a 3×2 grid of black jack dots on a sky-blue tile, with a
- * diagonal patch cord descending from the top-left dot through the centre and
- * thickening into a jack node toward the lower-right. Traced from the source
- * logo's own geometry. Brand colors are fixed (not theme-dependent).
+ * Novrix official brand mark and lockup from `novrix-stack-design-kit/brand/`.
+ * Rules:
+ * - Symbol (`novrix-mark.svg`): #14161B rounded square (rx=12 on 64), white 'N',
+ *   #C8F04A (`brand-lime`) underscore.
+ * - Lockup: N_ followed by NOVRIX (600, 0.04em) and Console (400, graphite-muted).
+ *   The lime color (#C8F04A) only exists on the underscore on a graphite background.
  */
-const TILE = "#4fb3e8";
-const DOT = "#101418";
-
-export default function Logo({ size = 16 }: { size?: number }) {
+export default function Logo({ size = 20 }: { size?: number }) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 48 48"
+      viewBox="0 0 64 64"
       fill="none"
       aria-hidden="true"
     >
-      <rect x="1" y="1" width="46" height="46" rx="12" fill={TILE} />
-      {/* Diagonal cord: top-left dot, down through centre, to lower-right node */}
+      <rect width="64" height="64" rx="12" fill="#14161B" />
       <path
-        d="M 16.5 16.5 L 24 24 L 30 30"
-        stroke={DOT}
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
+        d="M11.182 45.0V19.08H16.978L29.614 41.616L28.282 41.94V19.08H32.818V45.0H27.022L14.386 22.464L15.718 22.14V45.0Z"
+        fill="#FFFFFF"
       />
-      {/* Top row: three dots */}
-      <circle cx="16.5" cy="16.5" r="2.6" fill={DOT} />
-      <circle cx="24" cy="16" r="2.6" fill={DOT} />
-      <circle cx="31.5" cy="16" r="2.6" fill={DOT} />
-      {/* Bottom row: left dot, small centre, big node lower-right */}
-      <circle cx="16" cy="31.5" r="2.6" fill={DOT} />
-      <circle cx="23.5" cy="31.5" r="2.2" fill={DOT} />
-      <circle cx="30.5" cy="30" r="3.6" fill={DOT} />
+      <rect x="38.05" y="40" width="16" height="5" fill="#C8F04A" />
     </svg>
+  );
+}
+
+export function NovrixLockup() {
+  return (
+    <span className="novrix-lockup" aria-label="Novrix Console">
+      <svg
+        width="34"
+        height="22"
+        viewBox="14 6 38 25"
+        fill="none"
+        aria-hidden="true"
+        style={{ flexShrink: 0 }}
+      >
+        <path
+          d="M17.612 28.0V9.28H21.798L30.924 25.556L29.962 25.79V9.28H33.238V28.0H29.052L19.926 11.724L20.888 11.49V28.0Z"
+          fill="#FFFFFF"
+        />
+        <rect x="36.85" y="24.5" width="11" height="3.5" fill="#C8F04A" />
+      </svg>
+      <span className="novrix-wordmark">NOVRIX</span>
+      <span className="novrix-product">Console</span>
+    </span>
   );
 }

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allow outgoing SSH, RDP, and SFTP connections -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- Allow local port forwarding / listeners -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+    <!-- Allow USB-to-Serial console cables (/dev/cu.usbserial-*) -->
+    <key>com.apple.security.device.serial</key>
+    <true/>
+    <key>com.apple.security.device.usb</key>
+    <true/>
+    <!-- Allow WebKit JavaScript JIT for xterm.js under Hardened Runtime -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>

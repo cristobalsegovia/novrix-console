@@ -1,33 +1,126 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { ChevronDown, ChevronUp, RotateCcw, Search, X } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
-import type { SessionSpec } from "../types";
+import type { ExpectRule, SessionSpec } from "../types";
 import { TERM_THEMES, type ThemeMode } from "../theme";
 
 interface Props {
   spec: SessionSpec;
   active: boolean;
+  focusedPane: boolean;
   theme: ThemeMode;
+  status: "connecting" | "live" | "dead";
+  statusDetail?: string;
+  highlightEnabled: boolean;
+  expectRules: ExpectRule[];
+  searchTrigger: number;
+  reconnectEpoch: number;
+  onFocusPane: () => void;
   onSession: (sessionId: string) => void;
   onError: (message: string) => void;
+  onReconnect: () => void;
 }
 
-export default function TerminalView({ spec, active, theme, onSession, onError }: Props) {
+/**
+ * Apply lightweight ANSI color highlighting to plain text output chunks when the
+ * terminal is in normal line-scroll mode (not inside an alternate-screen TUI
+ * like vim, htop, or Claude Code, and not inside an escape sequence).
+ */
+function applyKeywordHighlight(bytes: number[]): Uint8Array {
+  // If chunk contains ESC (0x1b), pass through untouched so we never corrupt
+  // escape sequences, OSC 8 hyperlinks, or TUI cursor positioning.
+  if (bytes.includes(0x1b)) {
+    return new Uint8Array(bytes);
+  }
+  const text = new TextDecoder().decode(new Uint8Array(bytes));
+  const highlighted = text
+    // Critical / Error / Down keywords -> bright red
+    .replace(
+      /\b(ERROR|CRITICAL|FATAL|FAIL|FAILED|DOWN|err-disabled|notconnect|denied|dropped|CRC|collision|unreachable)\b/gi,
+      "\x1b[1;31m$1\x1b[0m",
+    )
+    // Warning / Flapping keywords -> amber/yellow
+    .replace(
+      /\b(WARN|WARNING|TIMEOUT|flapping|administratively down|half-duplex|mismatch)\b/gi,
+      "\x1b[1;33m$1\x1b[0m",
+    )
+    // Up / Healthy keywords -> green
+    .replace(
+      /\b(CONNECTED|ESTABLISHED|FULL|up\/up|forwarding)\b/gi,
+      "\x1b[1;32m$1\x1b[0m",
+    )
+    // Cisco / Network interfaces (Gi0/1, Te1/0/1, Fa0/1, Eth1/1, Po1, Vl100) -> cyan
+    .replace(
+      /\b((?:Gi|Te|Fa|Eth|Po|Vl|Lo|Tu|Mgmt|GigabitEthernet|TenGigabitEthernet|FastEthernet|Vlan|Port-channel)\d+(?:\/\d+)*(?:\.\d+)?)\b/g,
+      "\x1b[36m$1\x1b[0m",
+    )
+    // IPv4 addresses (with optional /CIDR) -> bright blue
+    .replace(
+      /\b((?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:\/\d{1,2})?)\b/g,
+      "\x1b[94m$1\x1b[0m",
+    );
+  return new TextEncoder().encode(highlighted);
+}
+
+export default function TerminalView({
+  spec,
+  active,
+  focusedPane,
+  theme,
+  status,
+  statusDetail,
+  highlightEnabled,
+  expectRules,
+  searchTrigger,
+  reconnectEpoch,
+  onFocusPane,
+  onSession,
+  onError,
+  onReconnect,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
   const sessionRef = useRef<string | null>(null);
-  const activeRef = useRef(active);
-  activeRef.current = active;
+  const isTabActiveRef = useRef(active);
+  isTabActiveRef.current = active;
+  const activeRef = useRef(active && focusedPane);
+  activeRef.current = active && focusedPane;
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const highlightRef = useRef(highlightEnabled);
+  highlightRef.current = highlightEnabled;
+  const expectRulesRef = useRef(expectRules);
+  expectRulesRef.current = expectRules;
+  const reconnectRef = useRef(onReconnect);
+  reconnectRef.current = onReconnect;
+
   const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
+
+  // Open search bar when triggered via ⌘F or Command Palette
+  useEffect(() => {
+    if (searchTrigger > 0 && active && focusedPane) {
+      setSearchOpen(true);
+      window.setTimeout(() => searchInputRef.current?.focus(), 20);
+    }
+  }, [searchTrigger, active, focusedPane]);
 
   useEffect(() => {
-    if (started.current || !containerRef.current) return;
-    started.current = true;
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = "";
 
     const term = new Terminal({
       fontFamily:
@@ -37,28 +130,22 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       cursorBlink: true,
       scrollback: 10_000,
       allowProposedApi: true,
-      // Hold Option (⌥) and drag to select text even when the running app
-      // (Claude Code, vim, htop…) has grabbed the mouse for its own use.
       macOptionClickForcesSelection: true,
       theme: TERM_THEMES[theme],
     });
     termRef.current = term;
     const fit = new FitAddon();
+    fitRef.current = fit;
+    const search = new SearchAddon();
+    searchAddonRef.current = search;
     term.loadAddon(fit);
-    // The last OSC 8 hyperlink the mouse hovered. Claude Code (and any Ink/OSC 8
-    // app) emits long URLs as OSC 8 hyperlinks that carry the *whole* URL in the
-    // escape sequence, independent of how the visible text is hard-wrapped. We
-    // capture that full URL on hover — hover fires even under mouse reporting
-    // (no button pressed), unlike the click — so ⌘⇧O can open it reliably.
+    term.loadAddon(search);
+
     let lastLinkUri: string | null = null;
 
-    // OSC 8 hyperlinks: this is how iTerm follows a wrapped login URL. The
-    // `text` handed to us is the complete URL from the escape, never the broken
-    // visible text. ⌘/Ctrl-click opens it; hover remembers it for ⌘⇧O.
     term.options.linkHandler = {
       activate: (event, text) => {
         if (event.metaKey || event.ctrlKey) {
-          console.debug("[sbt] osc8 activate ->", text);
           openUrl(text).catch((e) =>
             console.error("[sbt] openUrl (osc8) failed:", e),
           );
@@ -69,13 +156,9 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       },
     };
 
-    // Plain-text URLs (curl output, logs…): regex-matched and joined across
-    // soft-wrapped rows. Note this canNOT recover a URL that a TUI hard-wrapped
-    // into separate buffer lines — for those, the OSC 8 handler above / ⌘⇧O win.
     term.loadAddon(
       new WebLinksAddon((event, uri) => {
         if (event.metaKey || event.ctrlKey) {
-          console.debug("[sbt] weblink click ->", uri);
           openUrl(uri).catch((e) =>
             console.error("[sbt] openUrl (weblink) failed:", e),
           );
@@ -85,16 +168,6 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
     term.open(containerRef.current);
     fit.fit();
 
-    // --- Copy / paste --------------------------------------------------------
-    // ⌘C copies the current selection; ⌘V pastes. When a full-screen app
-    // (Claude Code, vim…) has grabbed the mouse, hold ⌥ (Option) and drag to
-    // select text, then ⌘C.
-    //
-    // Smart copy: xterm's getSelection() inserts a newline at every *visual*
-    // row break, which mangles long wrapped lines like OAuth URLs. We instead
-    // read the buffer and rejoin rows whose `isWrapped` flag says they're the
-    // continuation of the line above — reconstructing the logical lines the way
-    // Terminal.app does. Falls back to getSelection() if anything looks off.
     const smartSelectionText = (): string => {
       const pos = term.getSelectionPosition();
       if (!pos) return "";
@@ -102,8 +175,6 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       const startRow = pos.start.y;
       const endRow = pos.end.y;
 
-      // Walk the selected rows, joining continuation rows (isWrapped) to the
-      // line above instead of inserting a break at each visual wrap.
       const logical: string[] = [];
       let current = "";
       for (let row = startRow; row <= endRow; row++) {
@@ -116,10 +187,8 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
         if (row === startRow) {
           current = text;
         } else if (line.isWrapped) {
-          // Continuation of the previous visual row: no break.
           current += text;
         } else {
-          // Real new logical line.
           logical.push(current);
           current = text;
         }
@@ -132,9 +201,6 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
     const copySelection = async () => {
       let text = "";
       if (term.hasSelection()) {
-        // xterm 6's native getSelection() already rejoins soft-wrapped rows (it
-        // honours isWrapped internally), so it's correct for long URLs on its
-        // own. smartSelectionText() stays as a fallback if it comes back empty.
         text = term.getSelection();
         if (!text) {
           try {
@@ -144,19 +210,16 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
           }
         }
       } else if (lastLinkUri) {
-        // No text selected, but the mouse is (or was) over an OSC 8 link —
-        // clicking a link only highlights it, it doesn't create a selection, so
-        // ⌘C would otherwise copy nothing. Copy the link's full URL instead.
         text = lastLinkUri;
       }
       if (!text) return;
       try {
         await writeText(text);
-        console.debug(`[sbt] copied ${text.length} chars`);
       } catch (e) {
         console.error("[sbt] clipboard writeText failed:", e);
       }
     };
+
     const pasteClipboard = async () => {
       const id = sessionRef.current;
       if (!id) return;
@@ -168,18 +231,12 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       }
     };
 
-    // --- Open a URL without the mouse -----------------------------------------
-    // Reliable inside mouse-tracking TUIs (Claude Code, vim): find a URL in the
-    // current selection, or failing that in the logical line under the cursor,
-    // and open it in the browser. Bound to ⌘⇧O below.
     const URL_RE = /https?:\/\/[^\s]+/;
     const logicalLineAtCursor = (): string => {
       const buf = term.buffer.active;
       const cursorAbs = buf.baseY + buf.cursorY;
-      // Walk up to the first row of this logical (possibly wrapped) line.
       let start = cursorAbs;
       while (start > 0 && buf.getLine(start)?.isWrapped) start--;
-      // Collect this row plus any wrapped continuations below it.
       let text = "";
       for (let row = start; row < buf.length; row++) {
         const line = buf.getLine(row);
@@ -189,11 +246,9 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       }
       return text;
     };
+
     const openUrlFromContext = async () => {
-      // 1) Best source: the full URL from the OSC 8 link last under the mouse.
-      // This is the whole URL even when Claude Code hard-wrapped its display.
       if (lastLinkUri) {
-        console.debug("[sbt] ⌘⇧O open (osc8) ->", lastLinkUri);
         try {
           await openUrl(lastLinkUri);
         } catch (e) {
@@ -201,7 +256,6 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
         }
         return;
       }
-      // 2) Fallback: regex over the selection / cursor line (plain-text URLs).
       let source = "";
       if (term.hasSelection()) {
         source = term.getSelection();
@@ -215,13 +269,8 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       }
       if (!source) source = logicalLineAtCursor();
       const match = source.match(URL_RE);
-      if (!match) {
-        console.warn("[sbt] ⌘⇧O: no URL found in selection or cursor line");
-        return;
-      }
-      // Trim trailing punctuation that often clings to a URL in prose.
+      if (!match) return;
       const uri = match[0].replace(/[)\].,;:'"]+$/, "");
-      console.debug("[sbt] ⌘⇧O open ->", uri);
       try {
         await openUrl(uri);
       } catch (e) {
@@ -229,19 +278,10 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       }
     };
 
-    // ⌘⇧C: copy the full OSC 8 URL last under the mouse to the clipboard. Use
-    // this when you want the whole (un-wrapped) URL on the clipboard rather than
-    // opening it — hover the link first so it's captured, then ⌘⇧C.
     const copyLinkUri = async () => {
-      if (!lastLinkUri) {
-        console.warn(
-          "[sbt] ⌘⇧C: no URL captured — hover the link first, then ⌘⇧C",
-        );
-        return;
-      }
+      if (!lastLinkUri) return;
       try {
         await writeText(lastLinkUri);
-        console.debug(`[sbt] ⌘⇧C copied URL (${lastLinkUri.length} chars)`);
       } catch (e) {
         console.error("[sbt] ⌘⇧C writeText failed:", e);
       }
@@ -249,8 +289,11 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
-      // ⌘C / ⌘V are Mac copy/paste and must NOT reach the shell. Ctrl-C/Ctrl-V
-      // are left alone so Ctrl-C still interrupts the running process.
+      // When disconnected, pressing Enter reconnects immediately!
+      if (statusRef.current === "dead" && e.key === "Enter") {
+        reconnectRef.current();
+        return false;
+      }
       if (e.metaKey && !e.ctrlKey && !e.altKey) {
         if (e.key === "c" || e.key === "C") {
           if (e.shiftKey) void copyLinkUri();
@@ -261,7 +304,11 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
           void pasteClipboard();
           return false;
         }
-        // ⌘⇧O: open a URL from the selection / cursor line, mouse-free.
+        if (e.key === "f" || e.key === "F") {
+          setSearchOpen(true);
+          window.setTimeout(() => searchInputRef.current?.focus(), 20);
+          return false;
+        }
         if (e.shiftKey && (e.key === "o" || e.key === "O")) {
           void openUrlFromContext();
           return false;
@@ -270,17 +317,11 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       return true;
     });
 
-    // Backstop: intercept ⌘C / ⌘V at the window level in the capture phase, so
-    // they're handled even when a full-screen app (Claude Code, vim) has the
-    // keyboard focus and xterm's own handler never fires. Only the active tab's
-    // terminal responds, and only when the focus is inside this terminal.
     const onWindowKey = (e: KeyboardEvent) => {
       if (!activeRef.current) return;
       if (!e.metaKey || e.ctrlKey || e.altKey) return;
-      // Don't hijack ⌘C/⌘V while the user is typing in a real input field
-      // (the SSH dialog, the snippet editor, the filter box…).
-      const active = document.activeElement;
-      const tag = active?.tagName;
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === "c" || e.key === "C") {
         if (e.shiftKey) {
@@ -296,6 +337,11 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
         e.preventDefault();
         e.stopPropagation();
         void pasteClipboard();
+      } else if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        e.stopPropagation();
+        setSearchOpen(true);
+        window.setTimeout(() => searchInputRef.current?.focus(), 20);
       } else if (e.shiftKey && (e.key === "o" || e.key === "O")) {
         e.preventDefault();
         e.stopPropagation();
@@ -304,14 +350,12 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
     };
     window.addEventListener("keydown", onWindowKey, true);
 
-    // Right-click: copy the selection if any, otherwise paste.
     const onContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       if (term.hasSelection()) void copySelection();
       else void pasteClipboard();
     };
     containerRef.current.addEventListener("contextmenu", onContextMenu);
-    // Middle-click paste (X11-style), handy for many terminal users.
     const onAuxClick = (e: MouseEvent) => {
       if (e.button === 1) {
         e.preventDefault();
@@ -320,8 +364,51 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
     };
     containerRef.current.addEventListener("auxclick", onAuxClick);
 
+    let rollingBuffer = "";
+    const lastFired = new Map<string, number>();
+
     const onData = new Channel<number[]>();
-    onData.onmessage = (bytes) => term.write(new Uint8Array(bytes));
+    onData.onmessage = (bytes) => {
+      if (
+        highlightRef.current &&
+        term.buffer.active.type === "normal" &&
+        spec.kind !== "local"
+      ) {
+        term.write(applyKeywordHighlight(bytes));
+      } else {
+        term.write(new Uint8Array(bytes));
+      }
+
+      // Evaluate Expect / Auto-Responder triggers on remote sessions
+      if (spec.kind !== "local" && sessionRef.current) {
+        const activeRules = expectRulesRef.current.filter((r) => r.enabled);
+        if (activeRules.length > 0) {
+          const chunk = new TextDecoder().decode(new Uint8Array(bytes));
+          rollingBuffer = (rollingBuffer + chunk).slice(-320);
+          const now = Date.now();
+          for (const rule of activeRules) {
+            if (
+              rule.expectPattern &&
+              rollingBuffer.includes(rule.expectPattern)
+            ) {
+              const prev = lastFired.get(rule.id) ?? 0;
+              if (now - prev > 800) {
+                lastFired.set(rule.id, now);
+                rollingBuffer = "";
+                const payload = rule.sendText
+                  .replace(/\\r/g, "\r")
+                  .replace(/\\n/g, "\n");
+                void invoke("write_to_session", {
+                  id: sessionRef.current,
+                  data: payload,
+                });
+                break;
+              }
+            }
+          }
+        }
+      }
+    };
 
     const start = async () => {
       try {
@@ -331,7 +418,15 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
             ? await invoke("create_local_session", args)
             : spec.kind === "ssh"
               ? await invoke("create_ssh_session", { ...args, config: spec.config })
-              : await invoke("connect_saved_session", { ...args, id: spec.savedId });
+              : spec.kind === "serial"
+                ? await invoke("create_serial_session", {
+                    config: spec.config,
+                    onData,
+                  })
+                : await invoke("connect_saved_session", {
+                    ...args,
+                    id: spec.savedId,
+                  });
         sessionRef.current = id;
         onSession(id);
 
@@ -349,13 +444,21 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
     const observer = new ResizeObserver(() => {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
-        if (!activeRef.current) return;
-        fit.fit();
-        const id = sessionRef.current;
-        if (id) {
-          void invoke("resize_session", { id, cols: term.cols, rows: term.rows });
+        if (!isTabActiveRef.current) return;
+        try {
+          fit.fit();
+          const id = sessionRef.current;
+          if (id) {
+            void invoke("resize_session", {
+              id,
+              cols: term.cols,
+              rows: term.rows,
+            });
+          }
+        } catch {
+          /* ignore transient fit errors */
         }
-      }, 80);
+      }, 16);
     });
     observer.observe(containerRef.current);
 
@@ -369,8 +472,9 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
       if (id) void invoke("close_session", { id });
       term.dispose();
     };
+    // Re-run effect when reconnectEpoch increments to reconnect in place!
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reconnectEpoch]);
 
   // Live theme switching.
   useEffect(() => {
@@ -379,17 +483,130 @@ export default function TerminalView({ spec, active, theme, onSession, onError }
 
   // Refit whenever this tab becomes visible again.
   useEffect(() => {
-    if (active && containerRef.current) {
-      const el = containerRef.current.querySelector(".xterm");
-      if (el) window.dispatchEvent(new Event("resize"));
+    if (active && fitRef.current && termRef.current) {
+      window.requestAnimationFrame(() => {
+        try {
+          fitRef.current?.fit();
+          const id = sessionRef.current;
+          const term = termRef.current;
+          if (id && term) {
+            void invoke("resize_session", {
+              id,
+              cols: term.cols,
+              rows: term.rows,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      });
     }
   }, [active]);
 
+  const runSearch = (direction: "next" | "prev") => {
+    if (!searchAddonRef.current || !searchQuery) return;
+    const opts = { caseSensitive, regex: useRegex };
+    if (direction === "next") {
+      searchAddonRef.current.findNext(searchQuery, opts);
+    } else {
+      searchAddonRef.current.findPrevious(searchQuery, opts);
+    }
+  };
+
   return (
     <div
-      ref={containerRef}
-      className="terminal-host"
-      style={{ display: active ? "block" : "none" }}
-    />
+      className={`pane-wrap ${focusedPane ? "focused" : ""}`}
+      onMouseDown={onFocusPane}
+    >
+      {searchOpen && (
+        <div className="term-search-bar" onMouseDown={(e) => e.stopPropagation()}>
+          <Search size={13} className="term-search-icon" />
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (e.target.value) {
+                searchAddonRef.current?.findNext(e.target.value, {
+                  caseSensitive,
+                  regex: useRegex,
+                });
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                runSearch(e.shiftKey ? "prev" : "next");
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setSearchOpen(false);
+                termRef.current?.focus();
+              }
+            }}
+            placeholder="Buscar en consola…"
+          />
+          <button
+            type="button"
+            className={`term-search-opt ${caseSensitive ? "on" : ""}`}
+            title="Coincidir mayúsculas/minúsculas"
+            onClick={() => setCaseSensitive((v) => !v)}
+          >
+            Aa
+          </button>
+          <button
+            type="button"
+            className={`term-search-opt ${useRegex ? "on" : ""}`}
+            title="Expresión regular"
+            onClick={() => setUseRegex((v) => !v)}
+          >
+            .*
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            title="Coincidencia anterior (⇧Enter)"
+            onClick={() => runSearch("prev")}
+          >
+            <ChevronUp size={14} />
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            title="Siguiente coincidencia (Enter)"
+            onClick={() => runSearch("next")}
+          >
+            <ChevronDown size={14} />
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            title="Cerrar búsqueda (Esc)"
+            onClick={() => {
+              setSearchOpen(false);
+              termRef.current?.focus();
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <div ref={containerRef} className="terminal-host" />
+
+      {status === "dead" && (
+        <div className="reconnect-bar" onMouseDown={(e) => e.stopPropagation()}>
+          <span className="reconnect-msg">
+            Sesión finalizada{statusDetail ? ` (${statusDetail})` : ""}
+          </span>
+          <button
+            type="button"
+            className="btn accent sm"
+            onClick={onReconnect}
+          >
+            <RotateCcw size={12} /> Reconectar (Enter)
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

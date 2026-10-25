@@ -2,60 +2,10 @@ import type { ITheme } from "@xterm/xterm";
 
 export type ThemeMode = "dark" | "light";
 
-/** xterm palettes matched to the CSS variables in styles.css. */
-export const TERM_THEMES: Record<ThemeMode, ITheme> = {
-  dark: {
-    background: "#0f1418",
-    foreground: "#e8ecf1",
-    cursor: "#4fb3e8",
-    cursorAccent: "#0f1418",
-    selectionBackground: "#4fb3e844",
-    black: "#1c242c",
-    red: "#e15b4e",
-    green: "#45c46b",
-    yellow: "#e8b44f",
-    blue: "#4fb3e8",
-    magenta: "#b08ae0",
-    cyan: "#4ecdc4",
-    white: "#e8ecf1",
-    brightBlack: "#5c6a76",
-    brightRed: "#f07f70",
-    brightGreen: "#63d986",
-    brightYellow: "#f2c775",
-    brightBlue: "#7cc7f2",
-    brightMagenta: "#c7a6ee",
-    brightCyan: "#72ddd5",
-    brightWhite: "#f4f7fa",
-  },
-  light: {
-    background: "#ffffff",
-    foreground: "#1f2937",
-    cursor: "#1e88c7",
-    cursorAccent: "#ffffff",
-    selectionBackground: "#4fb3e833",
-    black: "#3d4852",
-    red: "#cc3d2f",
-    green: "#1f8a44",
-    yellow: "#9a6b0a",
-    blue: "#1e6fae",
-    magenta: "#7a4bad",
-    cyan: "#0e7d76",
-    white: "#8a97a3",
-    brightBlack: "#66727d",
-    brightRed: "#e04d3d",
-    brightGreen: "#249c50",
-    brightYellow: "#b57e0c",
-    brightBlue: "#1e88c7",
-    brightMagenta: "#8d5cc4",
-    brightCyan: "#0f938a",
-    brightWhite: "#2b3540",
-  },
-};
-
-const KEY = "sb-theme";
+const STORAGE_KEY = "novrix-console-theme";
 
 export function initialTheme(): ThemeMode {
-  const saved = localStorage.getItem(KEY);
+  const saved = localStorage.getItem(STORAGE_KEY);
   if (saved === "light" || saved === "dark") return saved;
   return window.matchMedia("(prefers-color-scheme: light)").matches
     ? "light"
@@ -63,5 +13,54 @@ export function initialTheme(): ThemeMode {
 }
 
 export function persistTheme(mode: ThemeMode) {
-  localStorage.setItem(KEY, mode);
+  localStorage.setItem(STORAGE_KEY, mode);
 }
+
+export const TERM_THEMES: Record<ThemeMode, ITheme> = {
+  dark: {
+    background: "#0E0F12",
+    foreground: "#E6E8EC",
+    cursor: "#7A97FF",
+    cursorAccent: "#0E0F12",
+    selectionBackground: "rgba(36, 87, 245, 0.34)",
+    black: "#171A20",
+    red: "#FF6B5E",
+    green: "#3FB97A",
+    yellow: "#E0A040",
+    blue: "#7A97FF",
+    magenta: "#C084FC",
+    cyan: "#38BDF8",
+    white: "#E6E8EC",
+    brightBlack: "#6B7280",
+    brightRed: "#FF8A80",
+    brightGreen: "#5CE096",
+    brightYellow: "#FBBF24",
+    brightBlue: "#9DB2FF",
+    brightMagenta: "#D8B4FE",
+    brightCyan: "#7DD3FC",
+    brightWhite: "#FFFFFF",
+  },
+  light: {
+    background: "#FFFFFF",
+    foreground: "#15171C",
+    cursor: "#2457F5",
+    cursorAccent: "#FFFFFF",
+    selectionBackground: "rgba(36, 87, 245, 0.18)",
+    black: "#15171C",
+    red: "#C2291F",
+    green: "#1F7A47",
+    yellow: "#9A5A00",
+    blue: "#2457F5",
+    magenta: "#7E22CE",
+    cyan: "#0E7490",
+    white: "#F4F5F7",
+    brightBlack: "#5A616D",
+    brightRed: "#DC2626",
+    brightGreen: "#16A34A",
+    brightYellow: "#CA8A04",
+    brightBlue: "#1B45CC",
+    brightMagenta: "#9333EA",
+    brightCyan: "#0891B2",
+    brightWhite: "#FFFFFF",
+  },
+};

@@ -4698,8 +4698,10 @@ dependencies = [
 
 [[package]]
 name = "switchboard"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
+ "aws-lc-rs",
+ "base64 0.22.1",
  "chrono",
  "dirs",
  "keyring",
@@ -4708,6 +4710,7 @@ dependencies = [
  "russh",
  "serde",
  "serde_json",
+ "serial2",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",

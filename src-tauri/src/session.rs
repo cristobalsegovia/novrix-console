@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use portable_pty::{MasterPty, PtySize};
 use serde::Serialize;
@@ -26,14 +26,20 @@ pub enum SessionHandle {
         writer: Mutex<Box<dyn Write + Send>>,
         master: Mutex<Box<dyn MasterPty + Send>>,
     },
+    Serial {
+        port: Mutex<serial2::SerialPort>,
+    },
     Async {
         tx: UnboundedSender<SessionCmd>,
     },
 }
 
+pub type SharedSshHandle = Arc<tokio::sync::Mutex<russh::client::Handle<crate::ssh::ClientHandler>>>;
+
 #[derive(Default)]
 pub struct SessionManager {
     sessions: Mutex<HashMap<String, SessionHandle>>,
+    ssh_handles: Mutex<HashMap<String, SharedSshHandle>>,
 }
 
 impl SessionManager {
@@ -41,7 +47,16 @@ impl SessionManager {
         self.sessions.lock().unwrap().insert(id, handle);
     }
 
+    pub fn insert_ssh(&self, id: String, ssh: SharedSshHandle) {
+        self.ssh_handles.lock().unwrap().insert(id, ssh);
+    }
+
+    pub fn get_ssh(&self, id: &str) -> Option<SharedSshHandle> {
+        self.ssh_handles.lock().unwrap().get(id).cloned()
+    }
+
     pub fn remove(&self, id: &str) -> Option<SessionHandle> {
+        self.ssh_handles.lock().unwrap().remove(id);
         self.sessions.lock().unwrap().remove(id)
     }
 
@@ -52,6 +67,11 @@ impl SessionManager {
                 let mut w = writer.lock().unwrap();
                 w.write_all(data).map_err(|e| e.to_string())?;
                 w.flush().map_err(|e| e.to_string())
+            }
+            Some(SessionHandle::Serial { port }) => {
+                let p = port.lock().unwrap();
+                p.write_all(data).map_err(|e| e.to_string())?;
+                p.flush().map_err(|e| e.to_string())
             }
             Some(SessionHandle::Async { tx }) => tx
                 .send(SessionCmd::Write(data.to_vec()))
@@ -73,6 +93,7 @@ impl SessionManager {
                     pixel_height: 0,
                 })
                 .map_err(|e| e.to_string()),
+            Some(SessionHandle::Serial { .. }) => Ok(()),
             Some(SessionHandle::Async { tx }) => tx
                 .send(SessionCmd::Resize { cols, rows })
                 .map_err(|e| e.to_string()),
@@ -119,13 +140,14 @@ pub fn create_local_session(
 pub async fn create_ssh_session(
     app: AppHandle,
     state: State<'_, SessionManager>,
+    store: State<'_, crate::store::Store>,
     config: crate::ssh::SshConfig,
     cols: u16,
     rows: u16,
     on_data: Channel<Vec<u8>>,
 ) -> Result<String, String> {
     let label = format!("{}@{}", config.username, config.host);
-    crate::ssh::spawn_ssh(app, &state, config, label, cols, rows, on_data).await
+    crate::ssh::spawn_ssh(app, &state, Some(&store), config, label, cols, rows, on_data).await
 }
 
 #[tauri::command]

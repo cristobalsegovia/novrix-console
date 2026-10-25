@@ -136,7 +136,7 @@ pub fn launch_rdp(app: AppHandle, config: RdpConfig) -> Result<(), String> {
     Ok(())
 }
 
-/// Launch a saved RDP session, pulling the password from the keychain.
+/// Launch a saved RDP session, pulling the password from the keychain or shared Identity.
 #[tauri::command]
 pub fn connect_saved_rdp(
     app: AppHandle,
@@ -147,12 +147,40 @@ pub fn connect_saved_rdp(
     if saved.protocol != "rdp" {
         return Err("this saved session is not an RDP session".into());
     }
+    let effective_identity = saved
+        .identity_id
+        .clone()
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            if saved.auth_method == "identity" {
+                store.resolve_group_identity(&saved.group_id)
+            } else {
+                None
+            }
+        });
+
+    let (username, password) = if let Some(ident_id) = effective_identity {
+        let ident = store.get_identity(&ident_id)?;
+        let user = if !ident.username.is_empty() {
+            ident.username
+        } else {
+            saved.username.clone()
+        };
+        let pw = secrets::get(&secrets::identity_password_account(&ident_id));
+        (user, pw)
+    } else {
+        (
+            saved.username.clone(),
+            secrets::get(&secrets::password_account(&id)),
+        )
+    };
+
     let config = RdpConfig {
         host: saved.host.clone(),
         port: saved.port,
-        username: saved.username.clone(),
+        username,
         domain: saved.domain.clone(),
-        password: secrets::get(&secrets::password_account(&id)),
+        password,
         resolution: saved.rdp_resolution.clone(),
         clipboard: true,
         multimon: false,

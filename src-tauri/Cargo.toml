@@ -1,6 +1,6 @@
 [package]
 name = "switchboard"
-version = "0.6.0"
+version = "0.7.0"
 description = "Switchboard Term — a session-oriented terminal for macOS"
 authors = ["Cristóbal Segovia"]
 license = "Apache-2.0"
@@ -27,6 +27,9 @@ dirs = "6.0"
 rusqlite = { version = "0.40", features = ["bundled"] }
 keyring = { version = "3.6", features = ["apple-native", "linux-native", "windows-native"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serial2 = "0.2"
+aws-lc-rs = "1.17"
+base64 = "0.22"
 tauri-plugin-clipboard-manager = "2.3"
 tauri-plugin-opener = "2.5"
 
