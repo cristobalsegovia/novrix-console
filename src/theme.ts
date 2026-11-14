@@ -2,14 +2,12 @@ import type { ITheme } from "@xterm/xterm";
 
 export type ThemeMode = "dark" | "light";
 
-const STORAGE_KEY = "novrix-console-theme";
+const STORAGE_KEY = "novrix-console-theme-v2";
 
 export function initialTheme(): ThemeMode {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: light)").matches
-    ? "light"
-    : "dark";
+  return "dark";
 }
 
 export function persistTheme(mode: ThemeMode) {

@@ -17,7 +17,7 @@ export interface SerialConfig {
   baudRate: number;
 }
 
-export type Protocol = "ssh" | "rdp" | "serial";
+export type Protocol = "ssh" | "rdp" | "vnc" | "serial";
 
 export interface RdpConfig {
   host: string;
@@ -26,8 +26,34 @@ export interface RdpConfig {
   domain?: string;
   password?: string;
   resolution?: string;
+  quality?: string;
   clipboard?: boolean;
+  audio?: boolean;
   multimon?: boolean;
+  jumpSessionId?: string;
+}
+
+export interface VncConfig {
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  variant?: string;
+  mode?: string;
+  quality?: string;
+  jumpSessionId?: string;
+}
+
+export interface RemoteProbeResult {
+  reachable: boolean;
+  latencyMs?: number | null;
+  banner?: string | null;
+}
+
+export interface VncAvailability {
+  available: boolean;
+  nativeScreenSharing: boolean;
+  tigervncBinary?: string | null;
 }
 
 export interface Identity {
@@ -83,9 +109,11 @@ export interface Snippet {
 }
 
 export type SessionSpec =
-  | { kind: "local" }
+  | { kind: "local"; command?: string }
   | { kind: "ssh"; config: SshConfig }
   | { kind: "serial"; config: SerialConfig }
+  | { kind: "rdp"; config: RdpConfig; savedId?: string }
+  | { kind: "vnc"; config: VncConfig; savedId?: string }
   | { kind: "saved"; savedId: string; protocol?: Protocol };
 
 export interface PaneState {

@@ -89,8 +89,8 @@ impl SessionManager {
                 .resize(PtySize {
                     rows,
                     cols,
-                    pixel_width: 0,
-                    pixel_height: 0,
+                    pixel_width: cols.saturating_mul(8),
+                    pixel_height: rows.saturating_mul(16),
                 })
                 .map_err(|e| e.to_string()),
             Some(SessionHandle::Serial { .. }) => Ok(()),

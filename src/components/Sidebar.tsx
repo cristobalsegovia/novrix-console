@@ -9,6 +9,7 @@ interface Actions {
   onConnectInSplit: (s: SavedSession) => void;
   onEdit: (s: SavedSession) => void;
   onNewInGroup: (groupId: string) => void;
+  onNewConnection?: () => void;
   onNewSubgroup: (parentId: string) => void;
   onCreateGroup: (name: string, parentId?: string) => void;
   onRenameGroup: (id: string, name: string) => void;
@@ -269,6 +270,13 @@ function GroupBranch({
               >
                 {s.name}
               </span>
+              {s.protocol !== "ssh" && (
+                <span className={`proto-pill ${s.protocol}`}>
+                  {s.protocol === "serial"
+                    ? "SER"
+                    : s.protocol.toUpperCase()}
+                </span>
+              )}
               <span className="host-ip-label">
                 {s.protocol === "serial"
                   ? (s.serialPort || s.host).replace("/dev/", "")
@@ -450,13 +458,35 @@ export default function Sidebar({
       )}
 
       <div className="tree" role="tree" aria-label="Nodos y sesiones">
-        {visible.length === 0 && (
-          <p className="tree-empty">
-            {tree.length === 0
-              ? "Sin sesiones guardadas."
-              : "Sin coincidencias."}
-          </p>
-        )}
+        {visible.length === 0 &&
+          (tree.length === 0 ? (
+            <div className="sidebar-empty-card">
+              <p className="sidebar-empty-title">Sin nodos guardados</p>
+              <p className="sidebar-empty-sub">
+                Agrega servidores SSH, escritorios RDP / VNC o consolas Serial.
+              </p>
+              <div className="sidebar-empty-actions">
+                {actions.onNewConnection && (
+                  <button
+                    type="button"
+                    className="btn accent sm"
+                    onClick={actions.onNewConnection}
+                  >
+                    + Nueva conexión
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={actions.onImportSshConfig}
+                >
+                  Importar ~/.ssh/config
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="tree-empty">Sin coincidencias.</p>
+          ))}
         {visible.map((group) => (
           <GroupBranch
             key={group.id}
@@ -517,18 +547,19 @@ export default function Sidebar({
                   >
                     Conectar
                   </button>
-                  {targetSession.protocol !== "rdp" && (
-                    <button
-                      type="button"
-                      className="context-item"
-                      onClick={() => {
-                        actions.onConnectInSplit(targetSession);
-                        setCtxMenu(null);
-                      }}
-                    >
-                      Abrir en panel dividido
-                    </button>
-                  )}
+                  {targetSession.protocol !== "rdp" &&
+                    targetSession.protocol !== "vnc" && (
+                      <button
+                        type="button"
+                        className="context-item"
+                        onClick={() => {
+                          actions.onConnectInSplit(targetSession);
+                          setCtxMenu(null);
+                        }}
+                      >
+                        Abrir en panel dividido
+                      </button>
+                    )}
                   <div className="context-sep" />
                   <button
                     type="button"

@@ -10,6 +10,7 @@ interface Props {
   onConnectSession: (session: SavedSession) => void;
   onRunSnippet: (command: string) => void;
   onNewLocal: () => void;
+  onOpenClaudeCode: () => void;
   onNewConnection: () => void;
   onSplitVertical: () => void;
   onSplitHorizontal: () => void;
@@ -30,7 +31,7 @@ interface PaletteItem {
   monoDetail?: string;
   rightMeta?: string;
   shortcut?: string;
-  dotKind?: "ssh" | "serial" | "rdp";
+  dotKind?: "ssh" | "serial" | "rdp" | "vnc";
   action: () => void;
 }
 
@@ -55,6 +56,7 @@ export default function CommandPalette({
   onConnectSession,
   onRunSnippet,
   onNewLocal,
+  onOpenClaudeCode,
   onNewConnection,
   onSplitVertical,
   onSplitHorizontal,
@@ -91,10 +93,33 @@ export default function CommandPalette({
 
     const actions: PaletteItem[] = [
       {
+        id: "act-claude",
+        category: "Acciones",
+        title: "Abrir pestaña de Claude Code",
+        monoDetail: "claude",
+        rightMeta: "Shift+Enter · OSC 52 · TrueColor",
+        shortcut: "⌘⇧A",
+        action: () => {
+          onOpenClaudeCode();
+          onClose();
+        },
+      },
+      {
+        id: "act-claude-here",
+        category: "Acciones",
+        title: "Ejecutar Claude Code en la consola activa",
+        monoDetail: "claude",
+        rightMeta: "Local o SSH remoto",
+        action: () => {
+          onRunSnippet("claude\r");
+          onClose();
+        },
+      },
+      {
         id: "act-conn",
         category: "Acciones",
         title: "Nueva conexión…",
-        rightMeta: "SSH, Serial o RDP",
+        rightMeta: "SSH, Serial, RDP o VNC",
         shortcut: "⌘N",
         action: () => {
           onNewConnection();
@@ -245,6 +270,7 @@ export default function CommandPalette({
     onConnectSession,
     onRunSnippet,
     onNewLocal,
+    onOpenClaudeCode,
     onNewConnection,
     onSplitVertical,
     onSplitHorizontal,

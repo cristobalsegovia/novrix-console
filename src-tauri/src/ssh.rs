@@ -504,15 +504,25 @@ pub async fn spawn_ssh(
         .await
         .map_err(|e| e.to_string())?;
     channel
-        .request_pty(false, "xterm-256color", cols as u32, rows as u32, 0, 0, &[])
+        .request_pty(
+            false,
+            "xterm-256color",
+            cols as u32,
+            rows as u32,
+            (cols as u32).saturating_mul(8),
+            (rows as u32).saturating_mul(16),
+            &[],
+        )
         .await
         .map_err(|e| e.to_string())?;
     for (name, value) in [
         ("LC_TERMINAL", "iTerm2"),
-        ("LC_TERMINAL_VERSION", "3.5.0"),
+        ("LC_TERMINAL_VERSION", "3.6.6"),
         ("TERM_PROGRAM", "iTerm.app"),
-        ("TERM_PROGRAM_VERSION", "3.5.0"),
+        ("TERM_PROGRAM_VERSION", "3.6.6"),
         ("COLORTERM", "truecolor"),
+        ("LANG", "en_US.UTF-8"),
+        ("LC_CTYPE", "UTF-8"),
     ] {
         let _ = channel.set_env(false, name, value).await;
     }

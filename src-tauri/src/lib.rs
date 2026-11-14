@@ -8,6 +8,7 @@ mod sftp;
 mod ssh;
 mod store;
 mod tunnels;
+mod vnc;
 
 use session::SessionManager;
 use store::Store;
@@ -59,6 +60,10 @@ pub fn run() {
             rdp::rdp_availability,
             rdp::launch_rdp,
             rdp::connect_saved_rdp,
+            vnc::vnc_availability,
+            vnc::launch_vnc,
+            vnc::connect_saved_vnc,
+            vnc::probe_remote_endpoint,
             store::list_tree,
             store::create_group,
             store::rename_group,

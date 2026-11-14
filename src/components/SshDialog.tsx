@@ -11,6 +11,7 @@ import type {
   SerialConfig,
   SessionDraft,
   SshConfig,
+  VncConfig,
 } from "../types";
 
 interface Props {
@@ -19,9 +20,11 @@ interface Props {
   rdpAvailable: boolean;
   initial?: SavedSession | null;
   presetGroupId?: string | null;
+  presetProtocol?: Protocol;
   onCancel: () => void;
   onConnectSsh: (config: SshConfig) => void;
   onConnectRdp: (config: RdpConfig) => void;
+  onConnectVnc: (config: VncConfig) => void;
   onConnectSerial: (config: SerialConfig) => void;
   onSave: (
     draft: SessionDraft,
@@ -71,25 +74,54 @@ export default function SshDialog({
   rdpAvailable,
   initial,
   presetGroupId,
+  presetProtocol,
   onCancel,
   onConnectSsh,
   onConnectRdp,
+  onConnectVnc,
   onConnectSerial,
   onSave,
   onInstallHint,
   onManageIdentities,
 }: Props) {
   const editing = Boolean(initial);
-  const [protocol, setProtocol] = useState<Protocol>(
-    initial?.protocol ?? "ssh",
-  );
+  const startProto = initial?.protocol ?? presetProtocol ?? "ssh";
+  const [protocol, setProtocol] = useState<Protocol>(startProto);
   const [name, setName] = useState(initial?.name ?? "");
   const [host, setHost] = useState(initial?.host ?? "");
   const [port, setPort] = useState(
-    String(initial?.port ?? (initial?.protocol === "rdp" ? 3389 : 22)),
+    String(
+      initial?.port ??
+        (startProto === "rdp" ? 3389 : startProto === "vnc" ? 5900 : 22),
+    ),
   );
-  const [username, setUsername] = useState(initial?.username ?? "root");
+  const [username, setUsername] = useState(
+    initial?.username ?? (startProto === "vnc" ? "" : "root"),
+  );
   const domain = initial?.domain ?? "";
+  const [rdpResolution, setRdpResolution] = useState(
+    initial?.protocol === "rdp" ? initial?.rdpResolution || "fit" : "fit",
+  );
+  const [rdpQuality, setRdpQuality] = useState(
+    initial?.protocol === "rdp" &&
+      initial?.domain &&
+      ["ultra", "balanced", "wan"].includes(initial.domain)
+      ? initial.domain
+      : "ultra",
+  );
+  const [vncVariant, setVncVariant] = useState(
+    initial?.protocol === "vnc" ? initial?.domain || "auto" : "auto",
+  );
+  const [vncMode, setVncMode] = useState(
+    initial?.protocol === "vnc"
+      ? (initial?.rdpResolution?.split("|")[0] || "shared")
+      : "shared",
+  );
+  const [vncQuality, setVncQuality] = useState(
+    initial?.protocol === "vnc" && initial?.rdpResolution?.includes("|")
+      ? initial.rdpResolution.split("|")[1]
+      : "ultra",
+  );
   const [authMode, setAuthMode] = useState<AuthMethod>(
     initial?.authMethod ?? "password",
   );
@@ -130,6 +162,7 @@ export default function SshDialog({
   );
 
   const isRdp = protocol === "rdp";
+  const isVnc = protocol === "vnc";
   const isSerial = protocol === "serial";
   const isSsh = protocol === "ssh";
 
@@ -158,8 +191,17 @@ export default function SshDialog({
 
   const switchProtocol = (p: Protocol) => {
     setProtocol(p);
-    if (p === "rdp" && (port === "22" || port === "")) setPort("3389");
-    if (p === "ssh" && (port === "3389" || port === "")) setPort("22");
+    if (p === "rdp" && (port === "22" || port === "5900" || port === ""))
+      setPort("3389");
+    if (p === "vnc" && (port === "22" || port === "3389" || port === "")) {
+      setPort("5900");
+      if (username === "root") setUsername("");
+      if (authMode === "key") setAuthMode("password");
+    }
+    if (p === "ssh" && (port === "3389" || port === "5900" || port === "")) {
+      setPort("22");
+      if (!username) setUsername("root");
+    }
   };
 
   const selectedIdentity = identities.find((i) => i.id === identityId);
@@ -168,11 +210,18 @@ export default function SshDialog({
       ? selectedIdentity.username
       : username.trim();
 
+  const resolveVncPort = (raw: string): number => {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return 5900;
+    if (n < 100) return 5900 + n; // Display number :1 -> 5901
+    return n;
+  };
+
   const ready = isSerial
     ? serialPort.trim() !== "" &&
       (!save || groupId !== NEW_GROUP || newGroupName.trim() !== "")
     : host.trim() !== "" &&
-      (authMode === "identity" || effectiveUsername !== "") &&
+      (isVnc || authMode === "identity" || effectiveUsername !== "") &&
       (!save || groupId !== NEW_GROUP || newGroupName.trim() !== "");
 
   const buildSsh = (): SshConfig => {
@@ -198,10 +247,25 @@ export default function SshDialog({
     host: host.trim(),
     port: Number(port) || 3389,
     username: effectiveUsername,
-    domain: domain.trim() || undefined,
+    domain: domain.trim() || rdpQuality,
     password: password || undefined,
-    resolution: "fit",
+    resolution: rdpResolution,
+    quality: rdpQuality,
     clipboard: true,
+    audio: true,
+    multimon: rdpResolution === "fullscreen",
+    jumpSessionId: jumpSessionId || undefined,
+  });
+
+  const buildVnc = (): VncConfig => ({
+    host: host.trim(),
+    port: resolveVncPort(port),
+    username: effectiveUsername || undefined,
+    password: password || undefined,
+    variant: vncVariant,
+    mode: vncMode,
+    quality: vncQuality,
+    jumpSessionId: jumpSessionId || undefined,
   });
 
   const buildSerial = (): SerialConfig => ({
@@ -218,15 +282,30 @@ export default function SshDialog({
         ? `${serialPort.trim().replace("/dev/", "")}`
         : host.trim()),
     host: isSerial ? serialPort.trim() : host.trim(),
-    port: Number(port) || (isRdp ? 3389 : 22),
-    username: isSerial ? "serial" : effectiveUsername || "root",
+    port: isVnc
+      ? resolveVncPort(port)
+      : Number(port) || (isRdp ? 3389 : 22),
+    username: isSerial
+      ? "serial"
+      : isVnc
+        ? effectiveUsername
+        : effectiveUsername || "root",
     authMethod: isSerial ? "password" : authMode,
     keyPath: isSsh && authMode === "key" ? keyPath.trim() : undefined,
     protocol,
-    domain: isRdp ? domain.trim() || undefined : undefined,
-    rdpResolution: isRdp ? "fit" : undefined,
+    domain: isRdp
+      ? rdpQuality
+      : isVnc
+        ? vncVariant
+        : undefined,
+    rdpResolution: isRdp
+      ? rdpResolution
+      : isVnc
+        ? `${vncMode}|${vncQuality}`
+        : undefined,
     identityId: authMode === "identity" ? identityId || undefined : undefined,
-    jumpSessionId: isSsh && jumpSessionId ? jumpSessionId : undefined,
+    jumpSessionId:
+      (isSsh || isVnc || isRdp) && jumpSessionId ? jumpSessionId : undefined,
     legacyCrypto: isSsh ? legacyCrypto : false,
     serialPort: isSerial ? serialPort.trim() : undefined,
     baudRate: isSerial ? Number(baudRate) || 115200 : undefined,
@@ -257,6 +336,8 @@ export default function SshDialog({
       );
     } else if (isRdp) {
       onConnectRdp(buildRdp());
+    } else if (isVnc) {
+      onConnectVnc(buildVnc());
     } else if (isSerial) {
       onConnectSerial(buildSerial());
     } else {
@@ -306,6 +387,13 @@ export default function SshDialog({
               onClick={() => switchProtocol("rdp")}
             >
               RDP
+            </button>
+            <button
+              type="button"
+              className={isVnc ? "on" : ""}
+              onClick={() => switchProtocol("vnc")}
+            >
+              VNC
             </button>
           </div>
 
@@ -365,14 +453,122 @@ export default function SshDialog({
                   />
                 </label>
                 <label>
-                  <span>Puerto</span>
+                  <span>{isVnc ? "Puerto o Display (:0)" : "Puerto"}</span>
                   <input
                     value={port}
                     onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
+                    placeholder={isVnc ? "5900" : undefined}
                     style={{ fontFamily: "var(--font-mono)" }}
                   />
                 </label>
               </div>
+
+              {isRdp && (
+                <div
+                  className="row-split"
+                  style={{ gridTemplateColumns: "1fr 1fr" }}
+                >
+                  <label>
+                    <span>Calidad de Imagen RDP</span>
+                    <select
+                      value={rdpQuality}
+                      onChange={(e) => setRdpQuality(e.target.value)}
+                    >
+                      <option value="ultra">
+                        Ultra HD (32-bit TrueColor + ClearType + GFX)
+                      </option>
+                      <option value="balanced">
+                        Equilibrada (24-bit + ClearType · VPN)
+                      </option>
+                      <option value="wan">
+                        Velocidad WAN (16-bit · Enlaces lentos)
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Resolución y Escalado</span>
+                    <select
+                      value={rdpResolution}
+                      onChange={(e) => setRdpResolution(e.target.value)}
+                    >
+                      <option value="fit">
+                        Dinámica (Ajustar a ventana)
+                      </option>
+                      <option value="retina">
+                        Retina HiDPI (Escalado nítido)
+                      </option>
+                      <option value="2560x1440">2560 × 1440 (QHD)</option>
+                      <option value="1920x1200">1920 × 1200 (16:10)</option>
+                      <option value="1920x1080">1920 × 1080 (Full HD)</option>
+                      <option value="fullscreen">
+                        Pantalla completa / Multi-monitor
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              )}
+
+              {isVnc && (
+                <>
+                  <div
+                    className="row-split"
+                    style={{ gridTemplateColumns: "1fr 1fr" }}
+                  >
+                    <label>
+                      <span>Variante / Codificación VNC</span>
+                      <select
+                        value={vncVariant}
+                        onChange={(e) => setVncVariant(e.target.value)}
+                      >
+                        <option value="auto">
+                          Automático (Screen Sharing / TigerVNC)
+                        </option>
+                        <option value="screensharing">
+                          macOS Screen Sharing / ARD (Nativo)
+                        </option>
+                        <option value="tight">TightVNC (Tight Encoding)</option>
+                        <option value="zrle">TigerVNC / RealVNC (ZRLE)</option>
+                        <option value="ultra">UltraVNC / Hextile</option>
+                        <option value="raw">Raw (LAN sin compresión)</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Modo de sesión</span>
+                      <select
+                        value={vncMode}
+                        onChange={(e) => setVncMode(e.target.value)}
+                      >
+                        <option value="shared">
+                          Escritorio compartido (Shared)
+                        </option>
+                        <option value="viewonly">
+                          Solo lectura (Monitorización)
+                        </option>
+                        <option value="fullscreen">
+                          Pantalla completa (Fullscreen)
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    <span>Calidad de Imagen VNC</span>
+                    <select
+                      value={vncQuality}
+                      onChange={(e) => setVncQuality(e.target.value)}
+                    >
+                      <option value="ultra">
+                        Ultra Nitidez (TrueColor 24-bit · Calidad 9 · Sin pérdida)
+                      </option>
+                      <option value="balanced">
+                        Equilibrada (Calidad 7 · Compresión media · VPN)
+                      </option>
+                      <option value="wan">
+                        Velocidad WAN (Calidad 4 · Compresión máxima)
+                      </option>
+                    </select>
+                  </label>
+                </>
+              )}
 
               <label>
                 <span>Autenticación</span>
@@ -432,11 +628,11 @@ export default function SshDialog({
               ) : (
                 <div className="row-split" style={{ gridTemplateColumns: "1fr 1fr" }}>
                   <label>
-                    <span>Usuario</span>
+                    <span>{isVnc ? "Usuario (opcional en VNC)" : "Usuario"}</span>
                     <input
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="root"
+                      placeholder={isVnc ? "(Sin usuario / ARD)" : "root"}
                       style={{ fontFamily: "var(--font-mono)" }}
                     />
                   </label>
@@ -501,7 +697,7 @@ export default function SshDialog({
           </div>
 
           {/* Opciones avanzadas colapsadas para no saturar */}
-          {isSsh && (
+          {(isSsh || isVnc || isRdp) && (
             <div>
               <button
                 type="button"
@@ -524,7 +720,9 @@ export default function SshDialog({
                 ) : (
                   <ChevronRight size={13} />
                 )}
-                Opciones avanzadas (Salto Bastión, equipos antiguos, passphrase)
+                {isVnc || isRdp
+                  ? `Opciones avanzadas (Túnel ${isRdp ? "RDP" : "VNC"} sobre SSH / Bastión)`
+                  : "Opciones avanzadas (Salto Bastión, equipos antiguos, passphrase)"}
               </button>
 
               {showAdvanced && (
@@ -540,7 +738,7 @@ export default function SshDialog({
                     gap: 10,
                   }}
                 >
-                  {authMode === "key" && (
+                  {isSsh && authMode === "key" && (
                     <label>
                       <span>Passphrase de la clave (opcional)</span>
                       <input
@@ -551,12 +749,16 @@ export default function SshDialog({
                     </label>
                   )}
                   <label>
-                    <span>Host de salto (ProxyJump / Bastión)</span>
+                    <span>
+                      {isVnc || isRdp
+                        ? `Tunelizar ${isRdp ? "RDP" : "VNC"} a través de servidor SSH (Bastión)`
+                        : "Host de salto (ProxyJump / Bastión)"}
+                    </span>
                     <select
                       value={jumpSessionId}
                       onChange={(e) => setJumpSessionId(e.target.value)}
                     >
-                      <option value="">Conexión directa (sin bastión)</option>
+                      <option value="">Conexión directa (sin túnel SSH)</option>
                       {sshSessions.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.label}
@@ -564,16 +766,18 @@ export default function SshDialog({
                       ))}
                     </select>
                   </label>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={legacyCrypto}
-                      onChange={(e) => setLegacyCrypto(e.target.checked)}
-                    />
-                    <span style={{ fontWeight: 400, fontSize: 12.5 }}>
-                      Cifrado compatible con switches/routers antiguos (diffie-hellman-group14-sha1)
-                    </span>
-                  </label>
+                  {isSsh && (
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={legacyCrypto}
+                        onChange={(e) => setLegacyCrypto(e.target.checked)}
+                      />
+                      <span style={{ fontWeight: 400, fontSize: 12.5 }}>
+                        Cifrado compatible con switches/routers antiguos (diffie-hellman-group14-sha1)
+                      </span>
+                    </label>
+                  )}
                   {!editing && (
                     <label className="checkbox-row">
                       <input

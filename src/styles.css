@@ -481,6 +481,10 @@ textarea:focus-visible {
   border: 1.5px solid var(--accent-text);
 }
 
+.host-status-dot.vnc {
+  background: var(--accent);
+}
+
 .host-main {
   flex: 1;
   border: 0;
@@ -1956,6 +1960,10 @@ textarea:focus-visible {
   color: var(--accent-text);
 }
 
+.proto-pill.vnc {
+  color: var(--accent);
+}
+
 .proto-pill.serial {
   color: var(--warn);
 }
@@ -2154,4 +2162,282 @@ textarea:focus-visible {
 
 .spin {
   animation: spin 0.9s linear infinite;
+}
+
+/* --- Sidebar Empty Onboarding Card & Dashboard Quick-Launch Grid --------- */
+
+.sidebar-empty-card {
+  margin: 10px 10px;
+  padding: 14px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-empty-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sidebar-empty-sub {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.sidebar-empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.empty-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.empty-hero-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 3px;
+}
+
+.empty-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(195px, 230px));
+  gap: 10px;
+  max-width: 720px;
+  width: 100%;
+  padding: 0 20px;
+}
+
+.empty-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.empty-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+}
+
+.empty-card-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.empty-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-weak);
+  color: var(--accent-text);
+}
+
+.empty-card-icon.ssh {
+  background: rgba(63, 185, 122, 0.14);
+  color: var(--ok);
+}
+
+.empty-card-icon.serial {
+  background: rgba(224, 160, 64, 0.14);
+  color: var(--warn);
+}
+
+.empty-card strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.empty-card > span {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* --- Remote Desktop HD Workspace (RDP & VNC In-Tab Session View) --------- */
+
+.rdp-vnc-workspace {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.rdp-vnc-card {
+  width: 100%;
+  max-width: 660px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 22px 24px;
+  box-shadow: var(--elevation-1);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.rdp-vnc-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.rdp-vnc-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  background: var(--accent-weak);
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rdp-vnc-title-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rdp-vnc-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rdp-vnc-ping {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+}
+
+.rdp-vnc-ping.online {
+  color: var(--ok);
+  border-color: rgba(63, 185, 122, 0.35);
+  background: rgba(63, 185, 122, 0.08);
+}
+
+.rdp-vnc-banner-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+}
+
+.rdp-vnc-title-group h3 {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rdp-vnc-endpoint {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.rdp-vnc-specs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.rdp-vnc-spec-box {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rdp-vnc-spec-box .spec-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.rdp-vnc-spec-box .spec-val {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.rdp-vnc-controls {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rdp-vnc-controls-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.rdp-vnc-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }

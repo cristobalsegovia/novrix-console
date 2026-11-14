@@ -141,6 +141,29 @@ export default function TerminalView({
     term.loadAddon(fit);
     term.loadAddon(search);
 
+    // Support OSC 52 clipboard writes so `/copy` in Claude Code (both locally
+    // and over remote SSH sessions) copies directly to the macOS clipboard.
+    const osc52Disposable = term.parser.registerOscHandler(52, (data) => {
+      const semi = data.indexOf(";");
+      if (semi === -1) return false;
+      const b64 = data.slice(semi + 1).trim();
+      if (!b64 || b64 === "?") return true;
+      try {
+        const binary = window.atob(b64.replace(/\s+/g, ""));
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const decoded = new TextDecoder("utf-8").decode(bytes);
+        if (decoded) {
+          void writeText(decoded);
+        }
+      } catch (e) {
+        console.error("[sbt] OSC 52 decode failed:", e);
+      }
+      return true;
+    });
+
     let lastLinkUri: string | null = null;
 
     term.options.linkHandler = {
@@ -221,11 +244,12 @@ export default function TerminalView({
     };
 
     const pasteClipboard = async () => {
-      const id = sessionRef.current;
-      if (!id) return;
+      if (!sessionRef.current) return;
       try {
         const text = await readText();
-        if (text) void invoke("write_to_session", { id, data: text });
+        // Use term.paste(text) so Bracketed Paste Mode (?2004h -> \x1b[200~...\x1b[201~)
+        // is respected by Claude Code, vim, and zsh instead of executing line-by-line.
+        if (text) term.paste(text);
       } catch (e) {
         console.error("[sbt] clipboard readText failed:", e);
       }
@@ -294,7 +318,52 @@ export default function TerminalView({
         reconnectRef.current();
         return false;
       }
+
+      const id = sessionRef.current;
+
+      // Claude Code & Zsh multi-line prompt newline: Shift+Enter or Option+Enter
+      // sends ESC+CR (\x1b\r) which Claude Code & ZLE treat as insert-newline
+      // without submitting the prompt.
+      if (
+        e.key === "Enter" &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        (e.shiftKey || e.altKey)
+      ) {
+        if (id) void invoke("write_to_session", { id, data: "\x1b\r" });
+        return false;
+      }
+
+      // macOS Option+Arrow / Option+Backspace word navigation in Claude Code & Zsh
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        if (e.key === "ArrowLeft") {
+          if (id) void invoke("write_to_session", { id, data: "\x1bb" });
+          return false;
+        }
+        if (e.key === "ArrowRight") {
+          if (id) void invoke("write_to_session", { id, data: "\x1bf" });
+          return false;
+        }
+        if (e.key === "Backspace") {
+          if (id) void invoke("write_to_session", { id, data: "\x1b\x7f" });
+          return false;
+        }
+      }
+
       if (e.metaKey && !e.ctrlKey && !e.altKey) {
+        // Cmd+Left / Cmd+Right / Cmd+Backspace line navigation & kill-line
+        if (!e.shiftKey && e.key === "ArrowLeft") {
+          if (id) void invoke("write_to_session", { id, data: "\x01" });
+          return false;
+        }
+        if (!e.shiftKey && e.key === "ArrowRight") {
+          if (id) void invoke("write_to_session", { id, data: "\x05" });
+          return false;
+        }
+        if (!e.shiftKey && e.key === "Backspace") {
+          if (id) void invoke("write_to_session", { id, data: "\x15" });
+          return false;
+        }
         if (e.key === "c" || e.key === "C") {
           if (e.shiftKey) void copyLinkUri();
           else void copySelection();
@@ -430,6 +499,13 @@ export default function TerminalView({
         sessionRef.current = id;
         onSession(id);
 
+        if (spec.kind === "local" && spec.command) {
+          const initialCmd = spec.command;
+          window.setTimeout(() => {
+            void invoke("write_to_session", { id, data: `${initialCmd}\r` });
+          }, 150);
+        }
+
         term.onData((data) => {
           void invoke("write_to_session", { id, data });
         });
@@ -464,6 +540,7 @@ export default function TerminalView({
 
     const hostEl = containerRef.current;
     return () => {
+      osc52Disposable.dispose();
       observer.disconnect();
       window.removeEventListener("keydown", onWindowKey, true);
       hostEl?.removeEventListener("contextmenu", onContextMenu);

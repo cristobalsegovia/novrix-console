@@ -21,28 +21,72 @@ pub fn spawn_local(
         .openpty(PtySize {
             rows,
             cols,
-            pixel_width: 0,
-            pixel_height: 0,
+            pixel_width: cols.saturating_mul(8),
+            pixel_height: rows.saturating_mul(16),
         })
         .map_err(|e| e.to_string())?;
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
     let mut cmd = CommandBuilder::new(&shell);
-    cmd.arg("-l"); // login shell so the user's profile loads
+    cmd.arg("-i"); // interactive shell so ~/.zshrc loads
+    cmd.arg("-l"); // login shell so ~/.zprofile loads
     cmd.env("TERM", "xterm-256color");
-    // Advertise an iTerm2-class identity so CLIs that gate features on the
-    // terminal (Claude Code, gh, etc.) emit OSC 8 hyperlinks and truecolor.
-    // Claude Code only emits OSC 8 URLs when TERM_PROGRAM is a known terminal
-    // (iTerm.app/ghostty/kitty/…); without this it prints raw URLs that break
-    // across wrapped lines. LC_TERMINAL mirrors iTerm and survives SSH.
+    // Advertise an iTerm2 3.6.6+ identity so CLIs that gate features on the
+    // terminal (Claude Code, gh, etc.) emit OSC 8 hyperlinks, OSC 52 clipboard,
+    // truecolor, and native Shift+Enter / Option+Enter multi-line support.
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "iTerm.app");
-    cmd.env("TERM_PROGRAM_VERSION", "3.5.0");
+    cmd.env("TERM_PROGRAM_VERSION", "3.6.6");
     cmd.env("LC_TERMINAL", "iTerm2");
-    cmd.env("LC_TERMINAL_VERSION", "3.5.0");
+    cmd.env("LC_TERMINAL_VERSION", "3.6.6");
+
+    // Ensure UTF-8 locale when launched from macOS Finder/Dock (launchd omits LANG).
+    let lang = std::env::var("LANG").unwrap_or_default();
+    if !lang.to_ascii_uppercase().contains("UTF-8") && !lang.to_ascii_uppercase().contains("UTF8") {
+        cmd.env("LANG", "en_US.UTF-8");
+    }
+    cmd.env("LC_CTYPE", "UTF-8");
+
+    // Enrich PATH for macOS GUI launches so `claude`, `node`, `pnpm`, `brew`,
+    // `git`, `rg`, and `cargo` are always discoverable even before shell rc files.
+    let mut path_parts: Vec<String> = Vec::new();
     if let Some(home) = dirs::home_dir() {
+        let h = home.to_string_lossy();
+        for rel in [
+            ".local/bin",
+            ".claude/local",
+            "Library/pnpm",
+            "Library/pnpm/bin",
+            ".bun/bin",
+            ".cargo/bin",
+            ".volta/bin",
+            ".fnm/current/bin",
+            ".nvm/current/bin",
+        ] {
+            path_parts.push(format!("{h}/{rel}"));
+        }
         cmd.cwd(home);
     }
+    for sys in [
+        "/opt/homebrew/bin",
+        "/opt/homebrew/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+    ] {
+        path_parts.push(sys.to_string());
+    }
+    if let Ok(existing) = std::env::var("PATH") {
+        for seg in existing.split(':') {
+            if !seg.is_empty() && !path_parts.iter().any(|p| p == seg) {
+                path_parts.push(seg.to_string());
+            }
+        }
+    }
+    cmd.env("PATH", path_parts.join(":"));
 
     let mut child = pair
         .slave

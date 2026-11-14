@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Ellipsis, Plus, X } from "lucide-react";
+import {
+  Cable,
+  Ellipsis,
+  FolderInput,
+  Monitor,
+  Plus,
+  Server,
+  Sparkles,
+  Terminal,
+  X,
+} from "lucide-react";
 import { dragWindow } from "./drag";
 import CommandPalette from "./components/CommandPalette";
 import IdentitiesModal from "./components/IdentitiesModal";
 import ImportModal from "./components/ImportModal";
 import Logo from "./components/Logo";
+import RemoteDesktopView from "./components/RemoteDesktopView";
 import SftpPanel from "./components/SftpPanel";
 import Sidebar from "./components/Sidebar";
 import SnippetBar from "./components/SnippetBar";
@@ -23,6 +34,7 @@ import type {
   IdentityDraft,
   Notice,
   PaneState,
+  Protocol,
   RdpAvailability,
   RdpConfig,
   SavedSession,
@@ -33,6 +45,7 @@ import type {
   Snippet,
   SshConfig,
   Tab,
+  VncConfig,
 } from "./types";
 
 let tabCounter = 0;
@@ -45,6 +58,17 @@ interface DialogState {
   open: boolean;
   initial?: SavedSession | null;
   presetGroupId?: string | null;
+  presetProtocol?: Protocol;
+}
+
+function findSavedById(nodes: GroupNode[], id: string): SavedSession | undefined {
+  for (const g of nodes) {
+    const found = g.sessions.find((s) => s.id === id);
+    if (found) return found;
+    const sub = findSavedById(g.children, id);
+    if (sub) return sub;
+  }
+  return undefined;
 }
 
 export default function App() {
@@ -204,11 +228,28 @@ export default function App() {
     [openTab],
   );
 
+  const openClaudeCode = useCallback(
+    () => openTab({ kind: "local", command: "claude" }, "Claude Code"),
+    [openTab],
+  );
+
   const openSaved = useCallback(
     (s: SavedSession) => {
       if (s.protocol === "rdp") {
         invoke("connect_saved_rdp", { id: s.id }).catch((e) =>
           pushNotice("danger", String(e)),
+        );
+        openTab(
+          { kind: "saved", savedId: s.id, protocol: "rdp" },
+          `${s.name} (RDP)`,
+        );
+      } else if (s.protocol === "vnc") {
+        invoke("connect_saved_vnc", { id: s.id }).catch((e) =>
+          pushNotice("danger", String(e)),
+        );
+        openTab(
+          { kind: "saved", savedId: s.id, protocol: "vnc" },
+          `${s.name} (VNC)`,
         );
       } else {
         openTab(
@@ -222,7 +263,7 @@ export default function App() {
 
   const openSavedInSplit = useCallback(
     (s: SavedSession) => {
-      if (s.protocol === "rdp") {
+      if (s.protocol === "rdp" || s.protocol === "vnc") {
         openSaved(s);
         return;
       }
@@ -446,10 +487,14 @@ export default function App() {
     const un3 = listen<string>("rdp-launched", (event) =>
       pushNotice("info", event.payload),
     );
+    const un4 = listen<string>("vnc-launched", (event) =>
+      pushNotice("info", event.payload),
+    );
     return () => {
       void un1.then((fn) => fn());
       void un2.then((fn) => fn());
       void un3.then((fn) => fn());
+      void un4.then((fn) => fn());
     };
   }, [pushNotice, dismissNotice, reconnectPane]);
 
@@ -469,6 +514,9 @@ export default function App() {
       } else if (meta && !e.shiftKey && (e.key === "t" || e.key === "T")) {
         e.preventDefault();
         openLocal();
+      } else if (meta && e.shiftKey && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        openClaudeCode();
       } else if (meta && !e.shiftKey && (e.key === "n" || e.key === "N")) {
         e.preventDefault();
         setDialog({ open: true });
@@ -502,7 +550,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openLocal, closeActivePaneOrTab, splitActiveTab]);
+  }, [openLocal, openClaudeCode, closeActivePaneOrTab, splitActiveTab]);
 
   // --- RDP & Serial ---------------------------------------------------------
   const copyInstall = () => {
@@ -516,6 +564,12 @@ export default function App() {
     );
   };
 
+  const launchVnc = (config: VncConfig) => {
+    invoke("launch_vnc", { config }).catch((e) =>
+      pushNotice("danger", String(e)),
+    );
+  };
+
   // --- Dialog actions -------------------------------------------------------
   const handleConnectSsh = (config: SshConfig) => {
     setDialog({ open: false });
@@ -525,6 +579,13 @@ export default function App() {
   const handleConnectRdp = (config: RdpConfig) => {
     setDialog({ open: false });
     launchRdp(config);
+    openTab({ kind: "rdp", config }, `${config.host} (RDP)`);
+  };
+
+  const handleConnectVnc = (config: VncConfig) => {
+    setDialog({ open: false });
+    launchVnc(config);
+    openTab({ kind: "vnc", config }, `${config.host} (VNC)`);
   };
 
   const handleConnectSerial = (config: SerialConfig) => {
@@ -584,6 +645,7 @@ export default function App() {
     onEdit: (s: SavedSession) => setDialog({ open: true, initial: s }),
     onNewInGroup: (groupId: string) =>
       setDialog({ open: true, presetGroupId: groupId }),
+    onNewConnection: () => setDialog({ open: true }),
     onCreateGroup: (name: string, parentId?: string) =>
       invoke("create_group", { name, parentId }).then(loadTree, (e) =>
         pushNotice("danger", String(e)),
@@ -801,11 +863,19 @@ export default function App() {
     ? "Sin sesión"
     : activePane.spec.kind === "local"
       ? "PTY local"
-      : activePane.spec.kind === "serial" ||
+      : activePane.spec.kind === "rdp" ||
           (activePane.spec.kind === "saved" &&
-            activePane.spec.protocol === "serial")
-        ? "Serial 8N1"
-        : "SSH-2.0";
+            activePane.spec.protocol === "rdp")
+        ? "RDP 32-bit HD"
+        : activePane.spec.kind === "vnc" ||
+            (activePane.spec.kind === "saved" &&
+              activePane.spec.protocol === "vnc")
+          ? "VNC RFB HD"
+          : activePane.spec.kind === "serial" ||
+              (activePane.spec.kind === "saved" &&
+                activePane.spec.protocol === "serial")
+            ? "Serial 8N1"
+            : "SSH-2.0";
 
   const activeStatusLabel =
     activePane?.status === "live"
@@ -920,6 +990,15 @@ export default function App() {
 
             <button
               type="button"
+              className="btn ghost sm"
+              title="Abrir nueva pestaña con Claude Code (⌘⇧A)"
+              onClick={openClaudeCode}
+            >
+              <Sparkles size={13} strokeWidth={1.7} /> Claude Code
+            </button>
+
+            <button
+              type="button"
               className="btn accent sm"
               title="Nueva conexión (⌘N)"
               onClick={() => setDialog({ open: true })}
@@ -952,6 +1031,18 @@ export default function App() {
                     width: 248,
                   }}
                 >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="context-item"
+                    onClick={() => {
+                      openClaudeCode();
+                      setToolsMenuOpen(false);
+                    }}
+                  >
+                    <span>Nueva pestaña Claude Code</span>
+                    <span className="menu-right-kbd">⌘⇧A</span>
+                  </button>
                   <button
                     type="button"
                     role="menuitem"
@@ -1079,16 +1170,139 @@ export default function App() {
           <main className="board">
             {tabs.length === 0 && (
               <div className="empty">
-                <span className="empty-logo">
-                  <Logo size={44} />
-                </span>
-                <p className="empty-title">Novrix Console</p>
-                <p className="empty-hint">
-                  Presiona <kbd className="palette-kbd">⌘K</kbd> para ir a un
-                  nodo, <kbd className="palette-kbd">⌘T</kbd> para una consola
-                  local o <kbd className="palette-kbd">⌘N</kbd> para una nueva
-                  conexión.
-                </p>
+                <div className="empty-hero">
+                  <span className="empty-logo">
+                    <Logo size={42} />
+                  </span>
+                  <div className="empty-hero-text">
+                    <p className="empty-title">Novrix Console</p>
+                    <p className="empty-hint">
+                      Centro de operaciones SSH-2.0, SFTP, RDP Ultra HD, VNC RFB
+                      y Serial UART en macOS.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="empty-grid">
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={openClaudeCode}
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon ssh">
+                        <Sparkles size={16} />
+                      </span>
+                      <kbd className="palette-kbd">⌘⇧A</kbd>
+                    </div>
+                    <strong>Claude Code (CLI)</strong>
+                    <span>
+                      Iniciar agente Claude Code con soporte Shift+Enter y OSC 52
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={openLocal}
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon ssh">
+                        <Terminal size={16} />
+                      </span>
+                      <kbd className="palette-kbd">⌘T</kbd>
+                    </div>
+                    <strong>Consola Local (zsh)</strong>
+                    <span>Abrir terminal POSIX nativa en este Mac</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={() =>
+                      setDialog({ open: true, presetProtocol: "ssh" })
+                    }
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon ssh">
+                        <Server size={16} />
+                      </span>
+                      <kbd className="palette-kbd">⌘N</kbd>
+                    </div>
+                    <strong>Servidor SSH y SFTP</strong>
+                    <span>SSH-2.0, salto Bastión y explorador de archivos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={() =>
+                      setDialog({ open: true, presetProtocol: "vnc" })
+                    }
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon vnc">
+                        <Monitor size={16} />
+                      </span>
+                      <span className="proto-pill vnc">VNC HD</span>
+                    </div>
+                    <strong>Escritorio VNC / ARD</strong>
+                    <span>
+                      Screen Sharing, TightVNC, TigerVNC y túnel SSH
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={() =>
+                      setDialog({ open: true, presetProtocol: "rdp" })
+                    }
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon rdp">
+                        <Monitor size={16} />
+                      </span>
+                      <span className="proto-pill rdp">RDP 32-BIT</span>
+                    </div>
+                    <strong>Escritorio Remoto RDP</strong>
+                    <span>
+                      TrueColor 32-bit, ClearType, Retina HiDPI y GFX
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={() =>
+                      setDialog({ open: true, presetProtocol: "serial" })
+                    }
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon serial">
+                        <Cable size={16} />
+                      </span>
+                      <span className="proto-pill serial">UART</span>
+                    </div>
+                    <strong>Consola Serial USB</strong>
+                    <span>Switches Cisco, routers y placas embebidas</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="empty-card"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <div className="empty-card-head">
+                      <span className="empty-card-icon ssh">
+                        <FolderInput size={16} />
+                      </span>
+                      <kbd className="palette-kbd">⌘K</kbd>
+                    </div>
+                    <strong>Importar Infraestructura</strong>
+                    <span>Cargar desde ~/.ssh/config, MobaXterm o CSV</span>
+                  </button>
+                </div>
               </div>
             )}
             {tabs.map((tab) => {
@@ -1101,43 +1315,94 @@ export default function App() {
                   }`}
                   style={{ display: isTabActive ? "flex" : "none" }}
                 >
-                  {tab.panes.map((pane) => (
-                    <TerminalView
-                      key={pane.paneId}
-                      spec={pane.spec}
-                      active={isTabActive}
-                      focusedPane={tab.activePaneId === pane.paneId}
-                      theme={theme}
-                      status={pane.status}
-                      statusDetail={pane.statusDetail}
-                      highlightEnabled={highlightEnabled}
-                      expectRules={expectRules}
-                      searchTrigger={searchTrigger}
-                      reconnectEpoch={pane.reconnectEpoch}
-                      onFocusPane={() =>
-                        setTabs((prev) =>
-                          prev.map((t) =>
-                            t.tabId === tab.tabId
-                              ? { ...t, activePaneId: pane.paneId }
-                              : t,
-                          ),
-                        )
-                      }
-                      onSession={(sessionId) =>
-                        patchPane(tab.tabId, pane.paneId, {
-                          sessionId,
-                          status: "live",
-                        })
-                      }
-                      onError={(message) =>
-                        patchPane(tab.tabId, pane.paneId, {
-                          status: "dead",
-                          statusDetail: message,
-                        })
-                      }
-                      onReconnect={() => reconnectPane(tab.tabId, pane.paneId)}
-                    />
-                  ))}
+                  {tab.panes.map((pane) => {
+                    const isRdpPane =
+                      pane.spec.kind === "rdp" ||
+                      (pane.spec.kind === "saved" &&
+                        pane.spec.protocol === "rdp");
+                    const isVncPane =
+                      pane.spec.kind === "vnc" ||
+                      (pane.spec.kind === "saved" &&
+                        pane.spec.protocol === "vnc");
+
+                    if (isRdpPane || isVncPane) {
+                      const savedSess =
+                        pane.spec.kind === "saved"
+                          ? findSavedById(tree, pane.spec.savedId)
+                          : undefined;
+                      return (
+                        <RemoteDesktopView
+                          key={pane.paneId}
+                          protocol={isRdpPane ? "rdp" : "vnc"}
+                          title={pane.title}
+                          rdpConfig={
+                            pane.spec.kind === "rdp"
+                              ? pane.spec.config
+                              : undefined
+                          }
+                          vncConfig={
+                            pane.spec.kind === "vnc"
+                              ? pane.spec.config
+                              : undefined
+                          }
+                          savedSession={savedSess}
+                          onStatusChange={(status, statusDetail) =>
+                            patchPane(tab.tabId, pane.paneId, {
+                              status,
+                              statusDetail,
+                            })
+                          }
+                          onOpenSshToHost={(sshCfg) =>
+                            openTab(
+                              { kind: "ssh", config: sshCfg },
+                              `${sshCfg.username}@${sshCfg.host}`,
+                            )
+                          }
+                          onNotice={pushNotice}
+                        />
+                      );
+                    }
+
+                    return (
+                      <TerminalView
+                        key={pane.paneId}
+                        spec={pane.spec}
+                        active={isTabActive}
+                        focusedPane={tab.activePaneId === pane.paneId}
+                        theme={theme}
+                        status={pane.status}
+                        statusDetail={pane.statusDetail}
+                        highlightEnabled={highlightEnabled}
+                        expectRules={expectRules}
+                        searchTrigger={searchTrigger}
+                        reconnectEpoch={pane.reconnectEpoch}
+                        onFocusPane={() =>
+                          setTabs((prev) =>
+                            prev.map((t) =>
+                              t.tabId === tab.tabId
+                                ? { ...t, activePaneId: pane.paneId }
+                                : t,
+                            ),
+                          )
+                        }
+                        onSession={(sessionId) =>
+                          patchPane(tab.tabId, pane.paneId, {
+                            sessionId,
+                            status: "live",
+                          })
+                        }
+                        onError={(message) =>
+                          patchPane(tab.tabId, pane.paneId, {
+                            status: "dead",
+                            statusDetail: message,
+                          })
+                        }
+                        onReconnect={() =>
+                          reconnectPane(tab.tabId, pane.paneId)
+                        }
+                      />
+                    );
+                  })}
                 </div>
               );
             })}
@@ -1285,9 +1550,11 @@ export default function App() {
           rdpAvailable={rdpAvailable}
           initial={dialog.initial}
           presetGroupId={dialog.presetGroupId}
+          presetProtocol={dialog.presetProtocol}
           onCancel={() => setDialog({ open: false })}
           onConnectSsh={handleConnectSsh}
           onConnectRdp={handleConnectRdp}
+          onConnectVnc={handleConnectVnc}
           onConnectSerial={handleConnectSerial}
           onSave={handleSave}
           onInstallHint={copyInstall}
@@ -1340,6 +1607,7 @@ export default function App() {
           onConnectSession={openSaved}
           onRunSnippet={sendSnippet}
           onNewLocal={openLocal}
+          onOpenClaudeCode={openClaudeCode}
           onNewConnection={() => setDialog({ open: true })}
           onSplitVertical={() => splitActiveTab("vertical")}
           onSplitHorizontal={() => splitActiveTab("horizontal")}

@@ -1302,7 +1302,7 @@ fn parse_csv_sessions(content: &str, default_user: &str) -> Vec<ImportedHost> {
             host: host.to_string(),
             port,
             username: username.to_string(),
-            protocol: if protocol == "rdp" || protocol == "serial" {
+            protocol: if protocol == "rdp" || protocol == "serial" || protocol == "vnc" {
                 protocol
             } else {
                 "ssh".into()

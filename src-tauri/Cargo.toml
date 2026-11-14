@@ -1,6 +1,6 @@
 [package]
 name = "switchboard"
-version = "0.7.0"
+version = "0.8.0"
 description = "Switchboard Term — a session-oriented terminal for macOS"
 authors = ["Cristóbal Segovia"]
 license = "Apache-2.0"
